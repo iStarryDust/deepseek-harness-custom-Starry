@@ -15,6 +15,7 @@
 
 - id: system-prompt
   config:
+    includeHarnessIdentity: false
     persona: >-
       You are a coding agent powered by the {{model}} model. Your working directory is {{cwd}}.
 
@@ -236,6 +237,12 @@
 
     - id: ui-workspace
       name: '@deepseek-ai/dsh-client-ui-workspace'
+
+    # Agent management surface: shadows the workspace browser in the sidebar
+    # browsing region at a lower slot priority; the conversation hero keeps
+    # the workspace picker.
+    - id: ui-agents
+      name: '@deepseek-ai/dsh-client-ui-agents'
 
     # Input triggers: the '/' | '@' pipeline (ui-input-trigger), the command surface over
     # it (ui-commands), and the reference sources (ui-skill / ui-reference).

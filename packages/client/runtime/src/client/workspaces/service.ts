@@ -86,7 +86,7 @@ export class WorkspaceRuntime implements IWorkspaces {
    * @param workspaceId - chosen Workspace (must be in the workspace list).
    * @returns the reused or newly created session id.
    */
-  async connectWorkspace(workspaceId: WorkspaceId): Promise<SessionId> {
+  async connectWorkspace(workspaceId: WorkspaceId, agentPreset?: string): Promise<SessionId> {
     const workspace = this.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)
     if (workspace === undefined) throw new Error(`workspaces.connectWorkspace: unknown workspace ${workspaceId}`)
     // Coalesce concurrent connects: a create's summary lands without cwd
@@ -109,7 +109,7 @@ export class WorkspaceRuntime implements IWorkspaces {
         && workspace.sessionIds.includes(summary.id)
         && !archived.includes(summary.id)) return summary.id
     }
-    const attempt = this.sessions.create({ workspaceId })
+    const attempt = this.sessions.create({ workspaceId, ...agentPreset === undefined ? {} : { agentPreset } })
       .finally(() => { this.connecting.delete(workspaceId) })
     this.connecting.set(workspaceId, attempt)
     return attempt
@@ -174,7 +174,7 @@ export class WorkspaceRuntime implements IWorkspaces {
    * stays usable).
    * @param workspaceId - explicit target Workspace for scoped actions.
    */
-  startSession(workspaceId?: WorkspaceId): void {
+  startSession(workspaceId?: WorkspaceId, agentPreset?: string): void {
     const workspace = this.list.getSnapshot()
     const current = this.sessions.list.getSnapshot().current
     const currentWorkspaceId = current === undefined
@@ -185,7 +185,7 @@ export class WorkspaceRuntime implements IWorkspaces {
       this.sessions.clear()
       return
     }
-    void this.connectWorkspace(target).then(
+    void this.connectWorkspace(target, agentPreset).then(
       (sessionId) => { this.sessions.open(sessionId) },
       (reason: unknown) => { console.warn('new session failed:', reason) },
     )

@@ -15,10 +15,12 @@
  * scrollbar indirection away while it is elsewhere, so a list the user is not
  * pointing at carries no bar.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import clsx from 'clsx'
 import {
-  FishLogo, IconNewChatOutline16, IconPanelLeftOutline16, Tooltip,
+  FishLogo,
+  IconAgentPresetOutline16, IconChevronLeftOutline14, IconPanelLeftOutline16,
+  Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SidebarRootComponentProps } from './contract/slots.ts'
 import css from './SidebarRoot.module.css'
@@ -43,10 +45,14 @@ export function SidebarRoot({
   collapsed,
   width,
   startSession,
+  pressPrimary,
+  inAgentPage,
   toggleSidebar,
   t,
   renderSlot,
 }: SidebarRootComponentProps) {
+  // The primary control reads as Back inside an agent page, Create otherwise.
+  const inAgent = useSyncExternalStore(inAgentPage.subscribe, inAgentPage.getSnapshot)
   // Wide content stays mounted while the collapse animates (fading via
   // .collapsed .wide), unmounts at settle, and remounts right away on expand.
   const [settled, setSettled] = useState(collapsed)
@@ -132,7 +138,7 @@ export function SidebarRoot({
           <button
             type="button"
             className={clsx(css.brand, css.wide)}
-            aria-label={t('session.new.label')}
+            aria-label={t('session.start.label')}
             onClick={() => { startSession() }}
           >
             <span className={css.brandIdentity} aria-hidden="true">
@@ -174,16 +180,29 @@ export function SidebarRoot({
         </Tooltip>
       </div>
 
-      {/* Expanded, the button carries its own label — tooltip only on the rail. */}
-      <Tooltip label={t('session.new.label')} delayMs={500} disabled={wide}>
+      {/* Expanded, the button carries its own label — tooltip only on the rail.
+          The primary control opens the agent create form on the roster page
+          and becomes a Back arrow inside an agent page; starting a bare
+          session stays available on the brand wordmark. */}
+      <Tooltip
+        label={inAgent ? t('session.back.label') : t('session.new.label')}
+        delayMs={500}
+        disabled={wide}
+      >
         <button
           type="button"
           className={css.newSession}
-          aria-label={t('session.new.label')}
-          onClick={() => { startSession() }}
+          aria-label={inAgent ? t('session.back.label') : t('session.new.label')}
+          onClick={() => { pressPrimary() }}
         >
-          <IconNewChatOutline16 size={wide ? 14 : 18} />
-          {wide && <span className={clsx(css.newSessionLabel, css.wide)}>{t('session.new')}</span>}
+          {inAgent
+            ? <IconChevronLeftOutline14 size={wide ? 14 : 18} />
+            : <IconAgentPresetOutline16 size={wide ? 14 : 18} />}
+          {wide && (
+            <span className={clsx(css.newSessionLabel, css.wide)}>
+              {inAgent ? t('session.back') : t('session.new')}
+            </span>
+          )}
         </button>
       </Tooltip>
 

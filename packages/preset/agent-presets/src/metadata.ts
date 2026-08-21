@@ -36,6 +36,19 @@ export interface PresetMetadata {
    * can read in capability order while authored ones stay alphabetical.
    */
   readonly order?: number
+  /**
+   * The language a locally authored agent replies in, as the authoring form
+   * captured it. Display text: it feeds the profile form's prefill, never
+   * the composition's behavior (the persona row is the behavior).
+   */
+  readonly language?: string
+  /**
+   * The persona instructions a locally authored agent's author wrote, as the
+   * authoring form captured them (before the composition's persona row folds
+   * in the language directive and runtime template). Display text only: it
+   * prefills the profile form, never the composition.
+   */
+  readonly persona?: string
 }
 
 /** A non-empty trimmed string, or undefined for anything else. */
@@ -74,12 +87,16 @@ export async function readPresetMetadata(directory: string): Promise<PresetMetad
   const record = parsed as Record<string, unknown>
   const name = text(record.name)
   const description = text(record.description)
+  const language = text(record.language)
+  const persona = text(record.persona)
   const order = typeof record.order === 'number' && Number.isFinite(record.order)
     ? record.order
     : undefined
   return {
     ...name === undefined ? {} : { name },
     ...description === undefined ? {} : { description },
+    ...language === undefined ? {} : { language },
+    ...persona === undefined ? {} : { persona },
     ...order === undefined ? {} : { order },
   }
 }
@@ -95,11 +112,18 @@ export async function readPresetMetadata(directory: string): Promise<PresetMetad
 export function renderPresetMetadata(metadata: PresetMetadata): string | undefined {
   const name = text(metadata.name)
   const description = text(metadata.description)
+  const language = text(metadata.language)
+  const persona = text(metadata.persona)
   const { order } = metadata
-  if (name === undefined && description === undefined && order === undefined) return undefined
+  if (
+    name === undefined && description === undefined
+    && language === undefined && persona === undefined && order === undefined
+  ) return undefined
   return yaml.dump({
     ...name === undefined ? {} : { name },
     ...description === undefined ? {} : { description },
+    ...language === undefined ? {} : { language },
+    ...persona === undefined ? {} : { persona },
     ...order === undefined ? {} : { order },
   }, { lineWidth: -1 })
 }

@@ -228,6 +228,15 @@ export abstract class SessionPersistence extends Service {
   abstract list(signal?: AbortSignal): Promise<SessionHeader[]>
 
   /**
+   * Delete a session's durable artifacts for good. The session must exist in
+   * this backend; a later {@link load} of the id then fails as unknown. Live
+   * in-memory instances are untouched (their state is already loaded), and
+   * workspace / archive bookkeeping is the caller's to reconcile.
+   * @param id - the persisted session to remove.
+   */
+  abstract remove(id: SessionId): Promise<void>
+
+  /**
    * List materialized sessions with cheap per-log change tokens.
    *
    * Repeated observations of an unchanged log return the same revision. A

@@ -255,6 +255,30 @@ export class WorkspaceRegistry extends Service {
   }
 
   /**
+   * Forget a session across the registry after its durable artifacts were
+   * deleted: detach it from every workspace's account and drop it from the
+   * archive set. Idempotent — an already-forgotten id writes nothing. The
+   * session itself is the caller's to delete; this only reconciles the
+   * workspace-domain bookkeeping so no stale slot or archive marker survives.
+   * @param sessionId - the removed session's id.
+   * @returns resolution after durability.
+   */
+  forgetSession(sessionId: SessionId): Promise<void> {
+    return this.enqueueOperation(async () => {
+      const state = this.requireState()
+      for (const entity of this.entities.values()) {
+        if (!entity.sessionIds.includes(sessionId)) continue
+        await entity.detachSession(sessionId)
+      }
+      if (!state.archivedSessionIds.includes(sessionId)) return
+      await this.setState({
+        ...state,
+        archivedSessionIds: state.archivedSessionIds.filter(id => id !== sessionId),
+      })
+    })
+  }
+
+  /**
    * Whether a session is live, header-indexed, or present in a fresh
    * persistence listing. Only a definite miss returns false — a failing
    * `sessionPersistence.list()` propagates so storage faults never

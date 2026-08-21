@@ -20,7 +20,7 @@ import { load } from 'js-yaml'
 import { entryListSchema } from '@deepseek-ai/cordis-plugin-include'
 import { expandHomePath } from '@deepseek-ai/dsh-home-paths'
 import { readPresetMetadata } from './metadata.ts'
-import { PRESET_ID, type AgentPreset, type PresetRoot } from './preset.ts'
+import { MODES_DIR, PRESET_ID, type AgentPreset, type PresetRoot, type PresetTrust } from './preset.ts'
 
 /** The composition file that makes a directory a preset. */
 export const COMPOSITION_FILE = 'agent.cordis.yml'
@@ -122,6 +122,44 @@ async function isFile(path: string): Promise<boolean> {
 }
 
 /**
+ * Whether `path` names an existing directory.
+ * @param path - absolute path to test.
+ * @returns true when the path resolves to a directory.
+ */
+async function isDirectory(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isDirectory()
+  } catch {
+    // Any stat failure — absent, unreadable, a dangling link — simply means
+    // this directory does not exist; the caller falls back to its flat path.
+    return false
+  }
+}
+
+/**
+ * One roster row from a directory holding a composition: its id, trust, path,
+ * health, and display metadata. Shared by the flat scan and the nested
+ * combined-preset scan so both read a preset exactly the same way.
+ * @param id - the preset id (the directory's logical name).
+ * @param directory - the directory holding the composition.
+ * @param trust - the trust the owning root records.
+ * @returns the discovered preset.
+ */
+async function presetAt(id: string, directory: string, trust: PresetTrust): Promise<AgentPreset> {
+  const path = join(directory, COMPOSITION_FILE)
+  const broken = await isFile(path)
+    ? await compositionProblem(path)
+    : `the composition file ${COMPOSITION_FILE} is missing — the directory still occupies the id; delete it or restore the file`
+  // Display text only, and never fatal: a preset with unreadable metadata
+  // still mounts, it just shows its id.
+  const metadata = await readPresetMetadata(directory)
+  return {
+    id, trust, path, ...metadata,
+    ...broken === undefined ? {} : { broken },
+  }
+}
+
+/**
  * Scan one root for preset directories.
  *
  * An absent root yields no presets rather than throwing: the user root does
@@ -132,7 +170,14 @@ async function isFile(path: string): Promise<boolean> {
  * when its composition is missing or unloadable. A directory named outside
  * {@link PRESET_ID} is skipped instead: no copy could ever claim that name,
  * so it blocks nothing, and reporting `.DS_Store`-grade residue as broken
- * presets would teach users to ignore the marker.
+ * presets would teach users to ignore the marker. A directory named
+ * {@link MODES_DIR} is a reserved container, never an agent.
+ *
+ * A directory that owns a `modes/` subdirectory ALSO contributes one
+ * combined preset per mode directory inside it: `<agentId>-<modeId>`, read
+ * from `<agentId>/modes/<modeId>/`. One agent is one folder — its identity at
+ * the top, each mode's composition nested below — while the roster keeps the
+ * flattened id the session layer binds.
  * @param root - the directory and the trust its presets inherit.
  * @returns the root's presets ordered by id.
  */
@@ -147,19 +192,25 @@ export async function scanRoot(root: PresetRoot): Promise<AgentPreset[]> {
   }
   const found: AgentPreset[] = []
   for (const child of children) {
-    if (!child.isDirectory() || !PRESET_ID.test(child.name)) continue
+    if (!child.isDirectory() || !PRESET_ID.test(child.name) || child.name === MODES_DIR) continue
     const directory = join(dir, child.name)
-    const path = join(directory, COMPOSITION_FILE)
-    const broken = await isFile(path)
-      ? await compositionProblem(path)
-      : `the composition file ${COMPOSITION_FILE} is missing — the directory still occupies the id; delete it or restore the file`
-    // Display text only, and never fatal: a preset with unreadable metadata
-    // still mounts, it just shows its id.
-    const metadata = await readPresetMetadata(directory)
-    found.push({
-      id: child.name, trust: root.trust, path, ...metadata,
-      ...broken === undefined ? {} : { broken },
-    })
+    found.push(await presetAt(child.name, directory, root.trust))
+    const modesDir = join(directory, MODES_DIR)
+    if (!await isDirectory(modesDir)) continue
+    let modeChildren
+    try {
+      modeChildren = await readdir(modesDir, { withFileTypes: true })
+    } catch {
+      continue
+    }
+    for (const modeChild of modeChildren) {
+      if (!modeChild.isDirectory() || !PRESET_ID.test(modeChild.name)) continue
+      found.push(await presetAt(
+        `${child.name}-${modeChild.name}`,
+        join(modesDir, modeChild.name),
+        root.trust,
+      ))
+    }
   }
   // Declared order first so the shipped set reads by capability; everything
   // else falls back to the id, which keeps authored presets stable.

@@ -117,6 +117,7 @@ export class FakeApiClient implements IApiClient {
     selectModel: (payload: ModelSelection & { sessionId: SessionId }) =>
       this.record('session.selectModel', payload, this.onSelectModel(payload)),
     rename: (payload: unknown) => this.record('session.rename', payload, this.onRename(payload)),
+    remove: (payload: unknown) => this.record('session.remove', payload, Promise.resolve(ok({ removed: true as const }))),
     fork: (payload: unknown) => this.record('session.fork', payload, this.onFork(payload)),
     prompt: (payload: unknown) => this.record('session.prompt', payload, this.onPrompt(payload)),
     attachment: (payload: unknown) => this.record('session.attachment', payload, this.onAttachment(payload)),
@@ -186,6 +187,10 @@ export class FakeApiClient implements IApiClient {
       }))),
     copy: (payload: { agentPreset: string }) =>
       this.record('agentPreset.copy', payload, Promise.resolve(ok({ agentPreset: payload.agentPreset }))),
+    create: (payload: { agentPreset: string }) =>
+      this.record('agentPreset.create', payload, Promise.resolve(ok({ agentPreset: payload.agentPreset }))),
+    update: (payload: { agentPreset: string }) =>
+      this.record('agentPreset.update', payload, Promise.resolve(ok({ agentPreset: payload.agentPreset }))),
     openDocument: (payload: { agentPreset: string }) =>
       this.record('agentPreset.openDocument', payload, Promise.resolve(ok({ opened: true as const }))),
     remove: (payload: { agentPreset: string }) =>

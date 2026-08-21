@@ -63,6 +63,29 @@ pnpm dsh web
   </tbody>
 </table>
 
+## 自定义发行版（iStarryDust fork）
+
+本仓库是定制 fork，在 DeepSeek Harness（`0.1.1-rc.2`）之上增加以 **Agent 为身份** 为核心的管理层。
+
+### 功能特性
+
+- **Agent 管理界面**（`packages/client/ui-agents`）：侧边栏 Agent 名单，支持创建 / 编辑身份表单与按 Agent 分组的聊天记录。
+- **Agent 即身份**：Agent 由名字、语言、描述与人格提示词定义；能力在开新对话时选择（标准 / PTC / 极简模式）。
+- **组合预设**：开新对话时组合 `<agentId>-<modeId>` 预设，将所选模式的工具组合与 Agent 人格合并。
+- **直接预设绑定**：从 Agent 页创建的会话直接绑定该 Agent 的组合预设。
+- **人格格式**：persona 行包含语言指令、工作目录行与用户人格提示词原文。
+- **会话管理**：每条聊天记录支持重命名 / 归档 / 物理删除（`session.remove` RPC 修复）。
+
+从源码运行：
+
+```sh
+git clone https://github.com/iStarryDust/deepseek-harness-custom-Starry.git
+cd deepseek-harness-custom-Starry
+pnpm install
+pnpm run build
+pnpm dsh web
+```
+
 ## 参与贡献
 
 参见 [CONTRIBUTING.md](CONTRIBUTING.zh.md)。

@@ -30,7 +30,10 @@ import type {} from '@deepseek-ai/dsh-agent'
 import { settingsNamespace, type SettingsScope, type default as SettingsService } from '@deepseek-ai/dsh-settings'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import { discoverPresets, USER_PRESET_DIR } from './discovery.ts'
-import { copyComposition, deleteComposition, readComposition } from './authoring.ts'
+import {
+  copyComposition, createComposition, deleteComposition, readComposition, updateComposition,
+  type CreateAgentInput,
+} from './authoring.ts'
 import { mountPreset, serviceForAgent, standingMountFor } from './mount.ts'
 import { PresetExistsError } from './authoring.ts'
 import { PresetMountError, UnknownPresetError, type AgentPreset, type Config, type PresetRoot } from './preset.ts'
@@ -59,8 +62,9 @@ export {
   type JoinedPresetMount, type PresetMount,
 } from './mount.ts'
 export {
-  copyComposition, deleteComposition, InvalidPresetIdError, PresetExistsError,
-  PresetNotWritableError, readComposition, writableRoot,
+  copyComposition, createComposition, deleteComposition, InvalidPresetIdError,
+  PresetExistsError, PresetNotWritableError, readComposition, updateComposition, writableRoot,
+  type CreateAgentInput,
 } from './authoring.ts'
 export { resolveSessionPreset, type PresetBearingSession } from './session.ts'
 export { PresetMountError, UnknownPresetError } from './preset.ts'
@@ -390,6 +394,45 @@ export class AgentPresets extends Service {
     // from disk outside `remove`); the new preset must not inherit it. Every
     // session already joined keeps the generation it runs on regardless.
     this.standing.delete(id)
+  }
+
+  /**
+   * Create a locally authored agent from a form: copy a base preset and write
+   * the agent's identity (name/language/persona) into the copy.
+   *
+   * Unlike {@link copy}, this is the identity-authoring write: the caller
+   * supplies persona text that is folded into the composition's `persona` row.
+   * The fold is text-scoped to that one row (never a general composition
+   * edit), so authoring still grants no plugin capability the base did not
+   * carry — it only names who the agent presents as.
+   * @param from - the base preset the agent starts from; any trust is accepted.
+   * @param id - the new preset id, which becomes its directory name.
+   * @param input - the creation form fields (name/language/persona).
+   * @throws when the source is unknown, the id is unusable or already taken,
+   * the deployment configures no writable root, or the persona cannot be folded.
+   */
+  async create(from: string, id: string, input: CreateAgentInput): Promise<void> {
+    const source = await this.resolve(from)
+    if ((await this.list()).some(preset => preset.id === id)) {
+      throw new PresetExistsError(id)
+    }
+    await createComposition(this.resolvedRoots, source, id, input)
+    this.standing.delete(id)
+  }
+
+  /**
+   * Rewrite a locally authored agent's identity (name/language/persona).
+   *
+   * The composition is re-read and its `persona` row folded anew; every other
+   * row is untouched, so an edit changes who the agent presents as, never what
+   * it can do. A shipped preset is refused.
+   * @param id - the preset id to rewrite.
+   * @param input - the profile form fields (name/language/persona).
+   * @throws when the preset is unknown or ships with the deployment, or the
+   * persona cannot be folded.
+   */
+  async update(id: string, input: CreateAgentInput): Promise<void> {
+    await updateComposition(await this.resolve(id), input)
   }
 
   /**

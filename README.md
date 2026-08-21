@@ -42,6 +42,29 @@ pnpm dsh web
 - Add the [`dsh-plugin`](https://github.com/topics/dsh-plugin) topic to your plugin repository for discoverability.
 - Join <a href="https://discord.gg/Ycq5dCaS4">DeepSeek Harness Discord community</a>.
 
+## Custom distribution (iStarryDust fork)
+
+This repository is a customized fork that layers an **agent-as-identity** management layer on top of DeepSeek Harness (`0.1.1-rc.2`).
+
+### Features
+
+- **Agent management UI** (`packages/client/ui-agents`): a sidebar agent roster with create/edit identity forms and per-agent chat history.
+- **Agent-as-identity**: an agent is defined by name, language, description, and persona prompt; capabilities are chosen per new session (standard / PTC / minimal modes).
+- **Composed presets**: a new session composes `<agentId>-<modeId>` presets, merging the selected mode's tool set with the agent persona.
+- **Direct preset binding**: sessions created from an agent page bind that agent's composed preset directly.
+- **Persona format**: the persona row carries the language instruction, working-directory line, and the user's persona text.
+- **Session management**: per-chat rename / archive / physical delete (via the `session.remove` RPC fix).
+
+Clone and run from source:
+
+```sh
+git clone https://github.com/iStarryDust/deepseek-harness-custom-Starry.git
+cd deepseek-harness-custom-Starry
+pnpm install
+pnpm run build
+pnpm dsh web
+```
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).

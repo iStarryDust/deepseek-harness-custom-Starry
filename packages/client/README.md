@@ -38,7 +38,8 @@ The browser side of the dsh web GUI: shell boot, browser-host communication, sha
 | [`ui-plan/`](ui-plan/README.md) | Presents active plan-mode status and its exit control. |
 | [`ui-settings-plugins/`](ui-settings-plugins/README.md) | Owns the Plugins settings section, its tab extension point, and configurable host-plane plugin cards. |
 | [`ui-user-questions/`](ui-user-questions/README.md) | Presents interactive questions requested by the agent. |
-| [`ui-agent-preset/`](ui-agent-preset/README.md) | Selects a session's agent preset and authors preset compositions. |
+| [`ui-agents/`](ui-agents/README.md) | Manages user agents: the sidebar roster, create/edit identity forms, per-agent chat history, and chat-time mode composition. |
+| [`ui-agent-preset/`](ui-agent-preset/README.md) | Selects a session's agent preset — the new-session mode chip and the general default — and authors preset compositions. |
 | [`ui-settings/`](ui-settings/README.md) | Hosts the settings interface and its extension areas. |
 | [`ui-settings-general/`](ui-settings-general/README.md) | Provides the general settings section. |
 | [`ui-settings-models/`](ui-settings-models/README.md) | Provides model-provider configuration and DeepSeek onboarding. |

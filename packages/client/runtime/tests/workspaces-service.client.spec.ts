@@ -422,16 +422,16 @@ describe('WorkspaceRuntime', () => {
 
     workspaces.startSession(wid('recent-home'))
     await Promise.resolve()
-    expect(connect).toHaveBeenLastCalledWith(wid('recent-home'))
+    expect(connect).toHaveBeenLastCalledWith(wid('recent-home'), undefined)
 
     workspaces.startSession()
     await Promise.resolve()
-    expect(connect).toHaveBeenLastCalledWith(wid('current-home'))
+    expect(connect).toHaveBeenLastCalledWith(wid('current-home'), undefined)
 
     sessions.clear()
     workspaces.startSession()
     await Promise.resolve()
-    expect(connect).toHaveBeenLastCalledWith(wid('recent-home'))
+    expect(connect).toHaveBeenLastCalledWith(wid('recent-home'), undefined)
 
     const emptyCtx = new Context()
     const emptyApi = new FakeApiClient()

@@ -96,6 +96,15 @@ export interface ISessions {
    */
   fork(opts: { sessionId: SessionId; atSeq?: number; increaseTitle?: boolean }): Promise<SessionId>
   /**
+   * Delete a session for good: its durable artifacts are removed on the host
+   * and the local row drops immediately. Final — the session cannot be
+   * reopened. A running session's in-memory instance is left to its own
+   * lifecycle; the deletion targets the durable record.
+   * @param sessionId - session to delete.
+   * @throws when the host rejects the removal.
+   */
+  remove(sessionId: SessionId): Promise<void>
+  /**
    * Register a per-session standard-props provider (hooks become `use<Name>`
    * selector hooks on the render side; props spread verbatim).
    * @param descriptor - static member roster plus per-session resolver.

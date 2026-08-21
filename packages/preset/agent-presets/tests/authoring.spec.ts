@@ -301,3 +301,42 @@ describe('a ghost directory under the user root', () => {
     expect((await ctx.agentPresets.list()).find(preset => preset.id === 'ghost')?.broken).toBeUndefined()
   })
 })
+
+describe('combined presets under an agent folder', () => {
+  it('creates a combined preset nested inside its agent directory', async () => {
+    await ctx.agentPresets.create('minimal', 'agent-a', { name: 'A', language: '中文', persona: 'p' })
+    await ctx.agentPresets.create('standard', 'agent-a-standard', {
+      name: 'A（标准模式）', language: '中文', persona: 'p',
+    })
+
+    // One agent is one folder: the combined composition lands under
+    // <agentId>/modes/<modeId>/, never as a sibling directory.
+    expect(existsSync(join(userRoot, 'agent-a', 'modes', 'standard', COMPOSITION_FILE))).toBe(true)
+    expect(existsSync(join(userRoot, 'agent-a-standard'))).toBe(false)
+    expect((await ctx.agentPresets.list()).find(preset => preset.id === 'agent-a-standard')?.path)
+      .toBe(join(userRoot, 'agent-a', 'modes', 'standard', COMPOSITION_FILE))
+  })
+
+  it('keeps a combined id flat when its agent does not exist yet', async () => {
+    // A combined id whose agent is absent falls back to a flat directory, so
+    // authoring never fails on the owning-agent lookup.
+    await ctx.agentPresets.create('standard', 'orphan-standard', {
+      name: '孤儿（标准模式）', language: '', persona: '',
+    })
+
+    expect(existsSync(join(userRoot, 'orphan-standard', COMPOSITION_FILE))).toBe(true)
+  })
+
+  it('deletes a combined preset from its nested directory, leaving the agent', async () => {
+    await ctx.agentPresets.create('minimal', 'agent-b', { name: 'B', language: '', persona: '' })
+    await ctx.agentPresets.create('standard', 'agent-b-standard', {
+      name: 'B（标准模式）', language: '', persona: '',
+    })
+
+    await ctx.agentPresets.remove('agent-b-standard')
+
+    expect(existsSync(join(userRoot, 'agent-b', 'modes', 'standard'))).toBe(false)
+    expect(existsSync(join(userRoot, 'agent-b'))).toBe(true)
+    expect((await ctx.agentPresets.list()).some(preset => preset.id === 'agent-b-standard')).toBe(false)
+  })
+})

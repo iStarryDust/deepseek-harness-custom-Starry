@@ -18,6 +18,13 @@ export type AgentPresetSettingsKey =
   | 'idRequired' | 'idInvalid' | 'idTaken'
   | 'deleteTitle' | 'deleteDescription' | 'deleteConfirm' | 'deleting'
 
+declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface LocaleNamespaceMap {
+    /** Agent-preset surface copy (hero chip, header label). */
+    'settings.agentPreset': AgentPresetSettingsKey
+  }
+}
+
 /** English copy. */
 export const en: Record<AgentPresetSettingsKey, string> = {
   title: 'Agent preset',
