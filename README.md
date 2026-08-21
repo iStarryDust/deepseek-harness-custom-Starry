@@ -44,18 +44,23 @@ pnpm dsh web
 
 ## Custom distribution (iStarryDust fork)
 
-This repository is a customized fork that layers an **agent-as-identity** management layer on top of DeepSeek Harness (`0.1.1-rc.2`).
+This is a customized fork of [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (**`0.1.1-rc.2`**), adding an **agent-as-identity** management layer on top of the official release.
 
-### Features
+### What's different from upstream
 
-- **Agent management UI** (`packages/client/ui-agents`): a sidebar agent roster with create/edit identity forms and per-agent chat history.
-- **Agent-as-identity**: an agent is defined by name, language, description, and persona prompt; capabilities are chosen per new session (standard / PTC / minimal modes).
-- **Composed presets**: a new session composes `<agentId>-<modeId>` presets, merging the selected mode's tool set with the agent persona.
-- **Direct preset binding**: sessions created from an agent page bind that agent's composed preset directly.
-- **Persona format**: the persona row carries the language instruction, working-directory line, and the user's persona text.
-- **Session management**: per-chat rename / archive / physical delete (via the `session.remove` RPC fix).
+| Area | Upstream DeepSeek Harness | This repository |
+|---|---|---|
+| `packages/client/ui-agents` | — | **New**: agent management UI (sidebar roster, create/edit forms, per-agent chat history) |
+| Agent identity | fixed per process | **agent-as-identity**: name / language / description / persona per agent; capability chosen per new session (standard / PTC / minimal) |
+| Preset layout | flat directory | nested under `agent/modes/<mode>/`; new session composes `<agentId>-<modeId>` presets |
+| Session from agent page | delayed hero binding | **direct composed-preset binding** |
+| Persona row | persona + language + runtime template | language instruction + working-directory line + persona text |
+| `session.remove` | injected bug | **fixed** |
+| Settings agent-preset entry | default row + management section | moved into the sidebar agent list |
 
-Clone and run from source:
+It also inherits everything from upstream `0.1.1-rc.2` — including the **unified image request pipeline** (normalized attachments, route-owned request versions, DeepSeek Files lifecycle).
+
+### Run from this fork
 
 ```sh
 git clone https://github.com/iStarryDust/deepseek-harness-custom-Starry.git

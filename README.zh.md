@@ -65,18 +65,23 @@ pnpm dsh web
 
 ## 自定义发行版（iStarryDust fork）
 
-本仓库是定制 fork，在 DeepSeek Harness（`0.1.1-rc.2`）之上增加以 **Agent 为身份** 为核心的管理层。
+本仓库是 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（**`0.1.1-rc.2`**）的定制 fork，在官方版本之上增加以 **Agent 为身份** 为核心的管理层。
 
-### 功能特性
+### 与上游的不同
 
-- **Agent 管理界面**（`packages/client/ui-agents`）：侧边栏 Agent 名单，支持创建 / 编辑身份表单与按 Agent 分组的聊天记录。
-- **Agent 即身份**：Agent 由名字、语言、描述与人格提示词定义；能力在开新对话时选择（标准 / PTC / 极简模式）。
-- **组合预设**：开新对话时组合 `<agentId>-<modeId>` 预设，将所选模式的工具组合与 Agent 人格合并。
-- **直接预设绑定**：从 Agent 页创建的会话直接绑定该 Agent 的组合预设。
-- **人格格式**：persona 行包含语言指令、工作目录行与用户人格提示词原文。
-- **会话管理**：每条聊天记录支持重命名 / 归档 / 物理删除（`session.remove` RPC 修复）。
+| 模块 | 上游 DeepSeek Harness | 本仓库 |
+|---|---|---|
+| `packages/client/ui-agents` | — | **新增**：Agent 管理界面（侧边栏名单、创建 / 编辑表单、按 Agent 分组的聊天记录） |
+| Agent 身份 | 进程级固定 | **Agent 即身份**：每个 Agent 有名字 / 语言 / 描述 / 人格；开新对话时选择能力（标准 / PTC / 极简） |
+| 预设布局 | 平级目录 | 嵌套于 `agent/modes/<模式>/`；开新对话组合 `<agentId>-<modeId>` 预设 |
+| 从 Agent 页创建会话 | 延迟 hero 绑定 | **直接绑定组合预设** |
+| persona 行 | 人格 + 语言指令 + 运行时模板 | 语言指令 + 工作目录行 + 人格原文 |
+| `session.remove` | 注入 bug | **已修复** |
+| 设置页 Agent 预设入口 | 默认行 + 管理分区 | 收归侧边栏 Agent 名单 |
 
-从源码运行：
+并继承上游 `0.1.1-rc.2` 的全部能力——含 **统一图像请求管线**（规范化附件、路由级请求版本、DeepSeek Files 生命周期）。
+
+### 从本 fork 运行
 
 ```sh
 git clone https://github.com/iStarryDust/deepseek-harness-custom-Starry.git
