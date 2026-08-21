@@ -104,6 +104,51 @@ describe('preset discovery', () => {
     expect(found.map(preset => preset.id)).toEqual(['usable'])
   })
 
+  it('expands an agent directory\'s modes/ subdirectories as combined presets', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-presets-combined-'))
+    await mkdir(join(root, 'agent-a'), { recursive: true })
+    await writeFile(join(root, 'agent-a', COMPOSITION_FILE), '[]\n')
+    for (const mode of ['standard', 'code']) {
+      await mkdir(join(root, 'agent-a', 'modes', mode), { recursive: true })
+      await writeFile(join(root, 'agent-a', 'modes', mode, COMPOSITION_FILE), '[]\n')
+    }
+
+    const found = await scanRoot({ path: root, trust: 'user' })
+
+    // One agent folder contributes its identity row plus one row per nested
+    // mode, each under the flattened `<agentId>-<modeId>` id the session layer
+    // binds, with the composition path pointing inside the agent folder.
+    expect(found.map(preset => preset.id)).toEqual(['agent-a', 'agent-a-code', 'agent-a-standard'])
+    expect(found.find(preset => preset.id === 'agent-a-standard')?.path)
+      .toBe(join(root, 'agent-a', 'modes', 'standard', COMPOSITION_FILE))
+    expect(found.every(preset => preset.trust === 'user')).toBe(true)
+  })
+
+  it('skips a top-level directory named modes as a reserved container', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-presets-modes-reserved-'))
+    await mkdir(join(root, 'modes'), { recursive: true })
+    await writeFile(join(root, 'modes', COMPOSITION_FILE), '[]\n')
+
+    const found = await scanRoot({ path: root, trust: 'user' })
+
+    // `modes` is the combined-preset container name, never an agent itself —
+    // reporting it would turn every agent folder's mode container into a row.
+    expect(found).toEqual([])
+  })
+
+  it('reports a broken combined preset under modes like any other slot', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-presets-combined-broken-'))
+    await mkdir(join(root, 'agent-b'), { recursive: true })
+    await writeFile(join(root, 'agent-b', COMPOSITION_FILE), '[]\n')
+    await mkdir(join(root, 'agent-b', 'modes', 'standard'), { recursive: true })
+
+    const found = await scanRoot({ path: root, trust: 'user' })
+
+    // The mode directory still occupies its flattened id; hiding it would
+    // leave nothing to see or delete, exactly like a flat ghost directory.
+    expect(found.find(preset => preset.id === 'agent-b-standard')?.broken).toMatch(/agent\.cordis\.yml is missing/)
+  })
+
   it('records the root trust on every preset it discovers', async () => {
     const found = await scanRoot(USER)
 

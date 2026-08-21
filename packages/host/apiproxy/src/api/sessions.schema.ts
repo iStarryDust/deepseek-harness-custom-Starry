@@ -127,6 +127,16 @@ export const sessionRenameValueSchema = z.object({
   seq: z.number().int().nonnegative(),
 }) satisfies z.ZodType<Wire<ResponseValue<'session.rename'>>>
 
+/** session.remove request payload. */
+export const sessionRemoveRequestSchema = z.object({
+  sessionId: sessionIdSchema,
+}) satisfies z.ZodType<Wire<RequestPayload<'session.remove'>>>
+
+/** session.remove response value. */
+export const sessionRemoveValueSchema = z.object({
+  removed: z.literal(true),
+}) satisfies z.ZodType<Wire<ResponseValue<'session.remove'>>>
+
 /** session.fork request payload (atSeq anchors the completed-turn cut). */
 export const sessionForkRequestSchema = z.object({
   sessionId: sessionIdSchema,

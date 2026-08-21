@@ -101,6 +101,12 @@ class MemoryPersistence extends SessionPersistence implements PersistenceBackend
     return this.coordinator.append(id, events)
   }
 
+  async remove(id: SessionId): Promise<void> {
+    const meta = this.store.get(id)?.meta
+    if (meta === undefined) throw new Error(`session "${id}" is not persisted in this backend`)
+    this.store.delete(id)
+  }
+
   override prepare(id: SessionId, signal?: AbortSignal): ReturnType<PersistenceCoordinator['prepare']> {
     return this.coordinator.prepare(id, signal)
   }

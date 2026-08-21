@@ -17,6 +17,46 @@ export type PresetTrust = 'system' | 'user'
  */
 export const PRESET_ID = /^[a-z0-9][a-z0-9-]*$/
 
+/**
+ * Subdirectory name under an agent's directory holding its per-mode combined
+ * presets. A combined preset lives at `<agentId>/<MODES_DIR>/<modeId>/`, so one
+ * agent is one folder: the identity files at the top, each mode's composition
+ * nested below. The name is a reserved slot: a top-level directory called
+ * `modes` is skipped by discovery rather than read as an agent.
+ */
+export const MODES_DIR = 'modes'
+
+/**
+ * The shipped mode ids a combined preset may be built from. Combined ids are
+ * `<agentId>-<modeId>`, matching the Web browser's combined-preset filter
+ * (`-(standard|code|minimal)$`); a same-named directory is shadowed by the
+ * nested layout, so the set is fixed here rather than derived from the roster.
+ */
+export const COMBINED_MODES = ['standard', 'code', 'minimal'] as const
+
+/** One combined preset's identity, split from its flattened id. */
+export interface CombinedParts {
+  /** The owning agent's preset id (its directory name). */
+  readonly agentId: string
+  /** The mode id the combined preset composes (`standard` / `code` / `minimal`). */
+  readonly modeId: string
+}
+
+/**
+ * Split a flattened combined-preset id (`<agentId>-<modeId>`) into its parts,
+ * when it is one.
+ * @param id - a preset id.
+ * @returns the agent and mode parts, or undefined for a bare preset id.
+ */
+export function combinedPartsOf(id: string): CombinedParts | undefined {
+  const match = /^(.+)-((?:standard|code|minimal))$/.exec(id)
+  if (match === null) return undefined
+  const agentId = match[1]
+  const modeId = match[2]
+  if (agentId === undefined || modeId === undefined) return undefined
+  return { agentId, modeId }
+}
+
 /** One preset directory that carries a mountable agent composition. */
 export interface AgentPreset {
   /** Stable identifier; the preset directory's name. */
@@ -31,6 +71,10 @@ export interface AgentPreset {
   readonly description?: string
   /** Declared position within its group; absent sorts after those that declare one. */
   readonly order?: number
+  /** Language a locally authored agent replies in, per its authoring form. */
+  readonly language?: string
+  /** Persona instructions a locally authored agent's author wrote, per its form. */
+  readonly persona?: string
   /**
    * Why this preset cannot compose a session, absent when it can. A broken
    * preset stays on the roster — hiding it would leave its directory blocking

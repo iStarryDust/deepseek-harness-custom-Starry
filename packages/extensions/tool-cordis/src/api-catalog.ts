@@ -182,6 +182,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['when the source is unknown, the id is unusable or already taken, or the deployment configures no writable root.'],
       },
       {
+        signature: 'async create(from: string, id: string, input: CreateAgentInput): Promise<void>',
+        description: 'Create a locally authored agent from a form: copy a base preset and fold the agent\'s identity (name/language/persona) into the copy.\n\nUnlike `copy`, this is the identity-authoring write: the caller supplies persona text that is folded into the composition\'s `persona` row. The fold is text-scoped to that one row (never a general composition edit), so authoring still grants no plugin capability the base did not carry — it only names who the agent presents as.',
+        parameters: [{ name: 'from', description: 'the base preset the agent starts from; any trust is accepted.' }, { name: 'id', description: 'the new preset id, which becomes its directory name.' }, { name: 'input', description: 'the creation form fields (name/language/persona).' }],
+        throws: ['when the source is unknown, the id is unusable or already taken, the deployment configures no writable root, or the persona cannot be folded.'],
+      },
+      {
+        signature: 'async update(id: string, input: CreateAgentInput): Promise<void>',
+        description: 'Rewrite a locally authored agent\'s identity (name/language/persona).\n\nThe composition is re-read and its `persona` row folded anew; every other row is untouched, so an edit changes who the agent presents as, never what it can do. A shipped preset is refused.',
+        parameters: [{ name: 'id', description: 'the preset id to rewrite.' }, { name: 'input', description: 'the profile form fields (name/language/persona).' }],
+        throws: ['when the preset is unknown or ships with the deployment, or the persona cannot be folded.'],
+      },
+      {
         signature: 'async remove(id: string): Promise<void>',
         description: 'Delete a locally authored preset.',
         parameters: [{ name: 'id', description: 'the preset id.' }],

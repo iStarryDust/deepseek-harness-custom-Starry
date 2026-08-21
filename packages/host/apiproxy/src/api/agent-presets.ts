@@ -84,6 +84,8 @@ export interface AgentPresetsApi {
     content: string
     name?: string
     description?: string
+    language?: string
+    persona?: string
   }>>
 
   /**
@@ -97,6 +99,40 @@ export interface AgentPresetsApi {
    * here or the id fallback is what distinguishes the rows.
    */
   copy(request: RpcRequest<{ from: string; agentPreset: string; name?: string }>):
+  Promise<RpcResponse<{ agentPreset: string }>>
+
+  /**
+   * Create a locally authored agent from a form: copy a base preset and fold
+   * the agent's identity (name/language/persona) into the copy.
+   *
+   * The persona fold is scoped to the composition's `persona` row only, so
+   * authoring still grants no plugin capability the base did not carry — it
+   * only names who the agent presents as. `from` is the base preset id.
+   */
+  create(request: RpcRequest<{
+    from: string
+    agentPreset: string
+    name: string
+    language: string
+    persona: string
+    description?: string
+  }>):
+  Promise<RpcResponse<{ agentPreset: string }>>
+
+  /**
+   * Rewrite a locally authored agent's identity (name/language/persona).
+   *
+   * The composition keeps every row except the `persona` row, so a profile
+   * edit changes who the agent presents as, never what it can do. Shipped
+   * presets are refused.
+   */
+  update(request: RpcRequest<{
+    agentPreset: string
+    name: string
+    language: string
+    persona: string
+    description?: string
+  }>):
   Promise<RpcResponse<{ agentPreset: string }>>
 
   /**

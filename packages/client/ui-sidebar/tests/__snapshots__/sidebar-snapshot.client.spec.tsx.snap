@@ -47,12 +47,12 @@ exports[`sidebar shell snapshots > renders the collapsed rail after the crossfad
       </button>
     </div>
     <button
-      aria-label="New session"
+      aria-label="Create Agent"
       class="newSession"
       type="button"
     >
       <svg
-        data-content="c0ce4dcc"
+        data-content="56ac24c5"
         fill="none"
         height="18"
         viewBox="0 0 16 16"
@@ -168,12 +168,12 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
       </button>
     </div>
     <button
-      aria-label="New session"
+      aria-label="Create Agent"
       class="newSession"
       type="button"
     >
       <svg
-        data-content="c0ce4dcc"
+        data-content="56ac24c5"
         fill="none"
         height="14"
         viewBox="0 0 16 16"
@@ -183,7 +183,7 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
       <span
         class="newSessionLabel wide"
       >
-        New Session
+        Create Agent
       </span>
     </button>
     <div
@@ -294,12 +294,12 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
       </button>
     </div>
     <button
-      aria-label="新建会话"
+      aria-label="创建 Agent"
       class="newSession"
       type="button"
     >
       <svg
-        data-content="c0ce4dcc"
+        data-content="56ac24c5"
         fill="none"
         height="14"
         viewBox="0 0 16 16"
@@ -309,7 +309,7 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
       <span
         class="newSessionLabel wide"
       >
-        新会话
+        创建 Agent
       </span>
     </button>
     <div

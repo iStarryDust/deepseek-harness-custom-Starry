@@ -1549,7 +1549,13 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
    * constants so the settings editor's save and delete are exercisable: the
    * roster a GUI journey sees after writing is the text it wrote.
    */
-  const fixturePresets = new Map<string, { trust: 'system' | 'user'; content: string }>([
+  const fixturePresets = new Map<string, {
+    trust: 'system' | 'user'
+    content: string
+    name?: string
+    language?: string
+    persona?: string
+  }>([
     ['standard', { trust: 'system', content: "- id: tool-bash\n  name: '@deepseek-ai/dsh-tool-bash'\n" }],
     ['minimal', { trust: 'system', content: "- id: tool-web-search\n  name: '@deepseek-ai/dsh-tool-web-search'\n" }],
     ['my-agent', { trust: 'user', content: "- id: tool-read\n  name: '@deepseek-ai/dsh-tool-read'\n" }],
@@ -2395,6 +2401,21 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         const appended = logOf(sessionId).at(-1) as SessionEvent
         return ok(request, { title: normalized, seq: appended.seq })
       },
+      remove: (request) => {
+        const { sessionId } = request.payload
+        const index = sessions.findIndex(summary => summary.sessionId === sessionId)
+        if (index < 0) {
+          return err(request, {
+            code: 'session-not-found',
+            message: `no session ${sessionId}`,
+            details: { sessionId },
+          })
+        }
+        sessions.splice(index, 1)
+        logs.delete(sessionId)
+        emitHost({ type: 'host/session-removed', sessionId })
+        return ok(request, { removed: true })
+      },
       fork: (request) => {
         const { sessionId, atSeq } = request.payload
         const source = summaryOf(sessionId)
@@ -2819,6 +2840,9 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
           agentPreset,
           trust: preset.trust,
           content: preset.content,
+          ...preset.name === undefined ? {} : { name: preset.name },
+          ...preset.language === undefined ? {} : { language: preset.language },
+          ...preset.persona === undefined ? {} : { persona: preset.persona },
         })
       },
       copy: (request) => {
@@ -2839,6 +2863,54 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
           })
         }
         fixturePresets.set(agentPreset, { trust: 'user', content: source.content })
+        return ok(request, { agentPreset })
+      },
+      // Identity authoring: the fixture stores the form fields as the content
+      // so list/read round-trip them like the host's preset.yml would.
+      create: (request) => {
+        const { from, agentPreset, name, language, persona } = request.payload
+        const source = fixturePresets.get(from)
+        if (source === undefined) {
+          return err(request, {
+            code: 'agent-preset-not-found',
+            message: `unknown agent preset "${from}"`,
+            details: { agentPreset: from, available: [...fixturePresets.keys()] },
+          })
+        }
+        if (fixturePresets.has(agentPreset)) {
+          return err(request, {
+            code: 'agent-preset-invalid',
+            message: `agent preset "${agentPreset}" already exists`,
+            details: { agentPreset, reason: 'already exists' },
+          })
+        }
+        fixturePresets.set(agentPreset, {
+          trust: 'user',
+          content: source.content,
+          name,
+          language,
+          persona,
+        })
+        return ok(request, { agentPreset })
+      },
+      update: (request) => {
+        const { agentPreset, name, language, persona } = request.payload
+        const existing = fixturePresets.get(agentPreset)
+        if (existing === undefined) {
+          return err(request, {
+            code: 'agent-preset-not-found',
+            message: `unknown agent preset "${agentPreset}"`,
+            details: { agentPreset, available: [...fixturePresets.keys()] },
+          })
+        }
+        if (existing.trust === 'system') {
+          return err(request, {
+            code: 'agent-preset-read-only',
+            message: `agent preset "${agentPreset}" ships with the deployment`,
+            details: { agentPreset, reason: 'it ships with the deployment' },
+          })
+        }
+        fixturePresets.set(agentPreset, { ...existing, name, language, persona })
         return ok(request, { agentPreset })
       },
       // Native opens are deterministic no-op successes in this fixture, so the
@@ -3182,6 +3254,7 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'session.models': return this.api.sessions.models(request)
       case 'session.selectModel': return this.api.sessions.selectModel(request)
       case 'session.rename': return this.api.sessions.rename(request)
+      case 'session.remove': return this.api.sessions.remove(request)
       case 'session.fork': return this.api.sessions.fork(request)
       case 'session.prompt': return this.api.sessions.prompt(request)
       case 'session.attachment': return this.api.sessions.attachment(request)
@@ -3208,6 +3281,8 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'agentPreset.select': return this.api.agentPresets.select(request)
       case 'agentPreset.read': return this.api.agentPresets.read(request)
       case 'agentPreset.copy': return this.api.agentPresets.copy(request)
+      case 'agentPreset.create': return this.api.agentPresets.create(request)
+      case 'agentPreset.update': return this.api.agentPresets.update(request)
       case 'agentPreset.openDocument': return this.api.agentPresets.openDocument(request, new AbortController().signal)
       case 'agentPreset.remove': return this.api.agentPresets.remove(request)
       case 'goal.create': return this.api.goals.create(request)

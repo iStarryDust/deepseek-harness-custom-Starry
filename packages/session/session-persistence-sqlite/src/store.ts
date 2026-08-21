@@ -260,6 +260,27 @@ export class SqliteStore implements PersistenceBackend<number> {
     }))
   }
 
+  /**
+   * Delete a session's rows for good: its metadata row and (via the schema's
+   * `ON DELETE CASCADE`) every event row. A session absent from this backend
+   * rejects rather than silently succeeding, so a caller can tell "already
+   * gone" from "never stored here".
+   * @param id - the persisted session to remove.
+   */
+  async remove(id: SessionId): Promise<void> {
+    await this.observe(undefined)
+    this.db.exec(sql('begin'))
+    try {
+      if (this.rowFor(id) === undefined) {
+        throw new Error(`session "${id}" is not persisted in this backend`)
+      }
+      this.db.prepare(sql('delete-session')).run(id)
+      this.db.exec(sql('commit'))
+    } catch (error: unknown) {
+      this.rollback(error, 'remove')
+    }
+  }
+
   async close(): Promise<void> {
     if (this.ready === undefined) {
       if (this.pathReady !== undefined) await Promise.allSettled([this.pathReady])
