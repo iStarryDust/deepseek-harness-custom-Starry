@@ -87,10 +87,27 @@ export interface SidebarFooterActionOwnerProps {
 
 /**
  * Registrant-private injected share (arrives via the register inject
- * factory). The shell keeps only its own controls: starting a Session from
- * the New Session button and toggling the column.
+ * factory). The shell keeps only its own controls: the primary control (agent
+ * create on the roster page, back from an agent page), starting a Session
+ * from the brand mark, and toggling the column.
  */
 export type SidebarRootInjected = {
+  /**
+   * Press the primary control. The agent-management surface (ui-agents)
+   * decides by its view: back from an agent page, open the create form on the
+   * roster page. The shell owns the entry point, the surface owns the action.
+   */
+  pressPrimary: () => void
+  /**
+   * Whether the agent surface is inside an agent page (the primary control
+   * then reads as Back). A subscription source the shell renders with.
+   */
+  inAgentPage: {
+    /** Current inside-agent flag. */
+    getSnapshot: () => boolean
+    /** Re-run on changes; returns the disposer. */
+    subscribe: (listener: () => void) => () => void
+  }
   /**
    * Start a New Session: with a workspace, reuse-or-create its blank session
    * and open it; without one, inherit the current Session Workspace, then the

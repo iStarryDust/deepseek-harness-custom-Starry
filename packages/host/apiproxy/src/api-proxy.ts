@@ -9,6 +9,19 @@ import { homedir } from 'node:os'
 import { dirname } from 'node:path'
 import { z as zod } from 'zod'
 import type { Context } from '@deepseek-ai/cordis'
+
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    /**
+     * A session's durable artifacts were deleted through `session.remove`.
+     * The host stream maps it to a `host/session-removed` frame so every
+     * connected client drops the row; the live in-memory instance, when one
+     * exists, is deliberately left to its own lifecycle.
+     * @mode emit
+     */
+    'api/session-durably-removed'(sessionId: SessionId): void
+  }
+}
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import type { Agent, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-presets/types'
@@ -2289,6 +2302,53 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         }
       },
 
+      async remove(request) {
+        const { sessionId } = request.payload
+        const found = await agentFor(sessionId)
+        const persistence = ctx.get('sessionPersistence')
+        if (persistence === undefined) {
+          return err(request, {
+            code: 'internal',
+            message: 'session removal is unavailable: this deployment mounts no session-persistence service',
+            details: {},
+          })
+        }
+        let persisted = false
+        if ('error' in found) {
+          // Not live: the deletion still works when the session exists in
+          // persistence, and fails loud when it is unknown everywhere.
+          try {
+            persisted = (await persistence.list())
+              .some(header => header.id === sessionId)
+          } catch (error) {
+            return err(request, {
+              code: 'internal',
+              message: `cannot enumerate persisted sessions: ${String(error)}`,
+              details: {},
+            })
+          }
+          if (!persisted) {
+            return err(request, {
+              code: 'session-not-found',
+              message: `session "${sessionId}" is neither live nor persisted`,
+              details: { sessionId },
+            })
+          }
+        }
+        try {
+          if (persisted) await persistence.remove(sessionId)
+          await ctx.workspaceRegistry.forgetSession(sessionId)
+        } catch (error) {
+          return err(request, {
+            code: 'internal',
+            message: `failed to remove session "${sessionId}": ${String(error)}`,
+            details: {},
+          })
+        }
+        ctx.emit('api/session-durably-removed', sessionId)
+        return ok(request, { removed: true })
+      },
+
       async fork(request) {
         const { sessionId, atSeq } = request.payload
         let source: SessionReadState
@@ -3078,6 +3138,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             content: await presets.read(preset.id),
             ...preset.name === undefined ? {} : { name: preset.name },
             ...preset.description === undefined ? {} : { description: preset.description },
+            ...preset.language === undefined ? {} : { language: preset.language },
+            ...preset.persona === undefined ? {} : { persona: preset.persona },
           })
         } catch (error: unknown) {
           return err(request, presetError(agentPreset, error))
@@ -3090,6 +3152,37 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         if (presets === undefined) return err(request, noRoster(agentPreset))
         try {
           await presets.copy(from, agentPreset, name)
+          return ok(request, { agentPreset })
+        } catch (error: unknown) {
+          return err(request, presetError(agentPreset, error))
+        }
+      },
+
+      // Identity authoring: the persona fold is scoped to the composition's
+      // `persona` row, so the caller supplies persona text but still cannot
+      // name plugins — authoring grants the base's capabilities and nothing more.
+      async create(request) {
+        const { from, agentPreset, name, language, persona, description } = request.payload
+        const presets = ctx.get('agentPresets')
+        if (presets === undefined) return err(request, noRoster(agentPreset))
+        try {
+          await presets.create(from, agentPreset, {
+            name, language, persona, ...description === undefined ? {} : { description },
+          })
+          return ok(request, { agentPreset })
+        } catch (error: unknown) {
+          return err(request, presetError(agentPreset, error))
+        }
+      },
+
+      async update(request) {
+        const { agentPreset, name, language, persona, description } = request.payload
+        const presets = ctx.get('agentPresets')
+        if (presets === undefined) return err(request, noRoster(agentPreset))
+        try {
+          await presets.update(agentPreset, {
+            name, language, persona, ...description === undefined ? {} : { description },
+          })
           return ok(request, { agentPreset })
         } catch (error: unknown) {
           return err(request, presetError(agentPreset, error))
@@ -3483,6 +3576,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           }),
           ctx.on('session/disposed', (session: Session) => {
             queue.push(frame({ type: 'host/session-removed', sessionId: session.id }))
+          }),
+          ctx.on('api/session-durably-removed', (sessionId: SessionId) => {
+            queue.push(frame({ type: 'host/session-removed', sessionId }))
           }),
           ctx.on('agent/status', ({ agent, status }: { agent: Agent; status: AgentStatus }) => {
             queue.push(frame({ type: 'host/session-status', sessionId: agent.id, running: status === 'running' }))

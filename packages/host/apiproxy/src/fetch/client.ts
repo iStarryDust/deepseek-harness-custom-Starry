@@ -27,6 +27,7 @@ import {
   sessionModelsValueSchema,
   sessionPromptValueSchema,
   sessionRenameValueSchema,
+  sessionRemoveValueSchema,
   sessionSearchValueSchema,
   sessionSelectModelValueSchema,
   sessionUpdateQueueValueSchema,
@@ -42,8 +43,9 @@ import {
 } from '../api/workspace.schema.ts'
 import { skillListValueSchema } from '../api/skills.schema.ts'
 import {
-  agentPresetCopyValueSchema, agentPresetListValueSchema, agentPresetOpenDocumentValueSchema,
-  agentPresetReadValueSchema, agentPresetRemoveValueSchema, agentPresetSelectValueSchema,
+  agentPresetCopyValueSchema, agentPresetCreateValueSchema, agentPresetListValueSchema,
+  agentPresetOpenDocumentValueSchema, agentPresetReadValueSchema, agentPresetRemoveValueSchema,
+  agentPresetSelectValueSchema, agentPresetUpdateValueSchema,
 } from '../api/agent-presets.schema.ts'
 import {
   goalCreateValueSchema,
@@ -93,6 +95,7 @@ export interface IApiClient {
     models(payload: RequestPayload<'session.models'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.models'>>>
     selectModel(payload: RequestPayload<'session.selectModel'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.selectModel'>>>
     rename(payload: RequestPayload<'session.rename'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.rename'>>>
+    remove(payload: RequestPayload<'session.remove'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.remove'>>>
     fork(payload: RequestPayload<'session.fork'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.fork'>>>
     prompt(payload: RequestPayload<'session.prompt'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.prompt'>>>
     attachment(payload: RequestPayload<'session.attachment'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'session.attachment'>>>
@@ -129,6 +132,8 @@ export interface IApiClient {
     select(payload: RequestPayload<'agentPreset.select'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.select'>>>
     read(payload: RequestPayload<'agentPreset.read'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.read'>>>
     copy(payload: RequestPayload<'agentPreset.copy'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.copy'>>>
+    create(payload: RequestPayload<'agentPreset.create'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.create'>>>
+    update(payload: RequestPayload<'agentPreset.update'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.update'>>>
     openDocument(payload: RequestPayload<'agentPreset.openDocument'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.openDocument'>>>
     remove(payload: RequestPayload<'agentPreset.remove'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.remove'>>>
   }
@@ -177,6 +182,7 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'session.models': sessionModelsValueSchema,
   'session.selectModel': sessionSelectModelValueSchema,
   'session.rename': sessionRenameValueSchema,
+  'session.remove': sessionRemoveValueSchema,
   'session.fork': sessionForkValueSchema,
   'session.prompt': sessionPromptValueSchema,
   'session.attachment': sessionAttachmentValueSchema,
@@ -203,6 +209,8 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'agentPreset.select': agentPresetSelectValueSchema,
   'agentPreset.read': agentPresetReadValueSchema,
   'agentPreset.copy': agentPresetCopyValueSchema,
+  'agentPreset.create': agentPresetCreateValueSchema,
+  'agentPreset.update': agentPresetUpdateValueSchema,
   'agentPreset.openDocument': agentPresetOpenDocumentValueSchema,
   'agentPreset.remove': agentPresetRemoveValueSchema,
   'goal.create': goalCreateValueSchema,
@@ -417,6 +425,7 @@ export abstract class AbstractApiClient implements IApiClient {
     models: (payload, signal) => this.callUnary('session.models', payload, signal),
     selectModel: (payload, signal) => this.callUnary('session.selectModel', payload, signal),
     rename: (payload, signal) => this.callUnary('session.rename', payload, signal),
+    remove: (payload, signal) => this.callUnary('session.remove', payload, signal),
     fork: (payload, signal) => this.callUnary('session.fork', payload, signal),
     prompt: (payload, signal) => this.callUnary('session.prompt', payload, signal),
     attachment: (payload, signal) => this.callUnary('session.attachment', payload, signal),
@@ -467,6 +476,8 @@ export abstract class AbstractApiClient implements IApiClient {
     select: (payload, signal) => this.callUnary('agentPreset.select', payload, signal),
     read: (payload, signal) => this.callUnary('agentPreset.read', payload, signal),
     copy: (payload, signal) => this.callUnary('agentPreset.copy', payload, signal),
+    create: (payload, signal) => this.callUnary('agentPreset.create', payload, signal),
+    update: (payload, signal) => this.callUnary('agentPreset.update', payload, signal),
     openDocument: (payload, signal) => this.callUnary('agentPreset.openDocument', payload, signal),
     remove: (payload, signal) => this.callUnary('agentPreset.remove', payload, signal),
   }

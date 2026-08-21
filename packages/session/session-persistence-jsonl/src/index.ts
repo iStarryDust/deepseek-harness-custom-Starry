@@ -448,6 +448,22 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     return (await this.listArtifacts(signal)).map(artifact => artifact.header)
   }
 
+  /**
+   * Delete a session's durable artifacts for good: its whole directory under
+   * the root (`session-<id>/`, holding the log and any sidecars). A session
+   * absent from this backend rejects rather than silently succeeding, so a
+   * caller can tell "already gone" from "never stored here".
+   * @param id - the persisted session to remove.
+   */
+  async remove(id: SessionId): Promise<void> {
+    const headers = await this.list()
+    const meta = headers.find(header => header.id === id)
+    if (meta === undefined) {
+      throw new Error(`session "${id}" is not persisted in this backend`)
+    }
+    await rm(sessionDir(this.root, meta.cwd, id), { recursive: true, force: true })
+  }
+
   /** List metadata plus a stat-derived identity for each append-only log. */
   async listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]> {
     const snapshots: SessionPersistenceSnapshot[] = []

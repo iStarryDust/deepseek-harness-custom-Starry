@@ -135,6 +135,22 @@ export class SessionForkError extends Error {
   }
 }
 
+/** Structured session-removal failure. */
+export class SessionRemoveError extends Error {
+  override readonly name = 'SessionRemoveError'
+
+  /**
+   * @param rpcError - Host business or folded transport error.
+   * @param sessionId - the session that could not be removed.
+   */
+  constructor(
+    readonly rpcError: RpcError,
+    readonly sessionId: SessionId,
+  ) {
+    super(`session remove failed: ${rpcError.code}: ${rpcError.message}`)
+  }
+}
+
 /** Session assembly handle for SessionProvider/inject factories (identity-stable per session). */
 export interface SessionBinding {
   readonly sessionId: SessionId
@@ -486,6 +502,7 @@ export class SessionRuntime implements ISessions {
     workspaceId?: WorkspaceId
     cwd?: string
     sessionId?: SessionId
+    agentPreset?: string
     reuseWorkspaceBlank?: true
   } = {}): Promise<SessionId> {
     const result = await this.manager.create(opts)
@@ -534,6 +551,20 @@ export class SessionRuntime implements ISessions {
       if (!renamed.ok) throw new Error(`fork child rename failed: ${renamed.error.code}: ${renamed.error.message}`)
     }
     return childId
+  }
+
+  /**
+   * Delete a session for good: its durable artifacts are removed on the host
+   * and the local row drops immediately (final — the session cannot be
+   * reopened). A running session's in-memory instance is the host's to leave
+   * to its own lifecycle; the deletion targets the durable record.
+   * @param sessionId - session to delete.
+   * @throws {SessionRemoveError} when the host rejects the removal.
+   */
+  async remove(sessionId: SessionId): Promise<void> {
+    const result = await this.manager.remove(sessionId)
+    if (!result.ok) throw new SessionRemoveError(result.error, sessionId)
+    this.projectList()
   }
 
   /**

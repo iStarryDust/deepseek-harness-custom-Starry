@@ -538,6 +538,7 @@ export class SessionManager {
       workspaceId?: WorkspaceId
       cwd?: string
       sessionId?: SessionId
+      agentPreset?: string
       reuseWorkspaceBlank?: true
     } = {},
   ): Promise<RpcResult<{ sessionId: SessionId }>> {
@@ -546,9 +547,10 @@ export class SessionManager {
         ...(opts.sessionId === undefined ? {} : { sessionId: opts.sessionId }),
         ...(opts.reuseWorkspaceBlank === undefined ? {} : { reuseWorkspaceBlank: opts.reuseWorkspaceBlank }),
       }
+      const preset = opts.agentPreset === undefined ? {} : { agentPreset: opts.agentPreset }
       const payload = opts.workspaceId !== undefined
-        ? { workspaceId: opts.workspaceId, ...shared }
-        : { ...(opts.cwd === undefined ? {} : { cwd: opts.cwd }), ...shared }
+        ? { workspaceId: opts.workspaceId, ...preset, ...shared }
+        : { ...(opts.cwd === undefined ? {} : { cwd: opts.cwd }), ...preset, ...shared }
       const { result } = await this.api.sessions.create(payload)
       if (result.ok) {
         this.recordMutation({ kind: 'upsert', summary: {
@@ -608,6 +610,25 @@ export class SessionManager {
     } catch (error) {
       return transportError(error)
     }
+  }
+
+  /**
+   * Delete a session for good: ask the host to remove its durable artifacts,
+   * then drop the local row immediately. The confirming `host/session-removed`
+   * frame arrives shortly after and is idempotent — the local removal already
+   * ran the same upkeep.
+   * @param sessionId - session to delete.
+   * @returns the remove result.
+   */
+  async remove(sessionId: SessionId): Promise<RpcResult<{ removed: true }>> {
+    const { result } = await this.api.sessions.remove({ sessionId })
+    if (result.ok) {
+      this.handleHostEnvelope({
+        rpcId: '' as never,
+        payload: { type: 'host/session-removed', sessionId },
+      } as unknown as RpcRequest<HostFrame>)
+    }
+    return result
   }
 
   /**

@@ -53,6 +53,8 @@ export const agentPresetReadValueSchema = z.object({
   content: z.string(),
   name: z.string().optional(),
   description: z.string().optional(),
+  language: z.string().optional(),
+  persona: z.string().optional(),
 }) satisfies z.ZodType<Wire<ResponseValue<'agentPreset.read'>>>
 
 /** agentPreset.copy request payload. */
@@ -66,6 +68,35 @@ export const agentPresetCopyRequestSchema = z.object({
 export const agentPresetCopyValueSchema = z.object({
   agentPreset: z.string(),
 }) satisfies z.ZodType<Wire<ResponseValue<'agentPreset.copy'>>>
+
+/** The editable identity fields shared by agentPreset.create / agentPreset.update. */
+const agentIdentitySchema = z.object({
+  name: z.string().min(1),
+  language: z.string().min(1),
+  persona: z.string().min(1),
+  description: z.string().optional(),
+})
+
+/** agentPreset.create request payload. */
+export const agentPresetCreateRequestSchema = agentIdentitySchema.extend({
+  from: z.string().min(1),
+  agentPreset: z.string().min(1),
+}) satisfies z.ZodType<Wire<RequestPayload<'agentPreset.create'>>>
+
+/** agentPreset.create response value. */
+export const agentPresetCreateValueSchema = z.object({
+  agentPreset: z.string(),
+}) satisfies z.ZodType<Wire<ResponseValue<'agentPreset.create'>>>
+
+/** agentPreset.update request payload. */
+export const agentPresetUpdateRequestSchema = agentIdentitySchema.extend({
+  agentPreset: z.string().min(1),
+}) satisfies z.ZodType<Wire<RequestPayload<'agentPreset.update'>>>
+
+/** agentPreset.update response value. */
+export const agentPresetUpdateValueSchema = z.object({
+  agentPreset: z.string(),
+}) satisfies z.ZodType<Wire<ResponseValue<'agentPreset.update'>>>
 
 /** agentPreset.openDocument request payload. */
 export const agentPresetOpenDocumentRequestSchema = z.object({

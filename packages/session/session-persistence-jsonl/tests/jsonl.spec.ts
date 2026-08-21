@@ -287,6 +287,24 @@ describe('JsonlSessionPersistence: durability and crash semantics', () => {
     expect((await ctx.sessionPersistence.list()).map(h => h.id)).toContain(m.id)
   })
 
+  it('remove deletes a session directory and drops it from the list', async () => {
+    const m = meta('remove-me', '/work')
+    await ctx.sessionPersistence.create(m)
+    await ctx.sessionPersistence.append(m.id, oneTurnLog())
+    const dir = sessionDir(root, '/work', m.id)
+    expect((await stat(dir)).isDirectory()).toBe(true)
+
+    await ctx.sessionPersistence.remove(m.id)
+
+    await expect(stat(dir)).rejects.toThrow()
+    expect((await ctx.sessionPersistence.list()).map(h => h.id)).not.toContain(m.id)
+  })
+
+  it('remove rejects a session this backend never stored', async () => {
+    await expect(ctx.sessionPersistence.remove(SessionId('session-ghost')))
+      .rejects.toThrow(/not persisted/)
+  })
+
   it('readRaw returns the stored artifact text verbatim with its original filename', async () => {
     const m = meta('raw-read', '/work')
     await ctx.sessionPersistence.create(m)

@@ -8,6 +8,12 @@
  *
  * The stage is forgotten once applied: the next new session starts from the
  * deployment default again, matching the workspace picker beside it.
+ *
+ * The hero offers CHAT-TIME MODES only (the shipped system presets minus the
+ * meta "cordis" mode); locally authored agents never appear here. When a chat
+ * starts from an agent page, the agent context routes the pick through a
+ * combined preset (mode composition + agent persona), so the session belongs
+ * to the agent's chat history while the chip still reads as a plain mode.
  */
 
 import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
@@ -17,11 +23,29 @@ import {
 import { messageOf, presetOptions } from './settings-store.ts'
 import type { AgentPresetOption } from './settings-store.ts'
 
+/** The meta preset offered only to preset authors; excluded from mode choices. */
+const META_PRESET_ID = 'cordis'
+
+/** The mode a chat from an agent page starts with when the user does not pick. */
+const DEFAULT_MODE_ID = 'standard'
+
+/** The chat-time agent context published by ui-agents, when present. */
+export interface AgentChatContext {
+  /** The agent a pending chat-start belongs to, absent otherwise. */
+  pendingAgent: () => string | undefined
+  /** Ensure the combined preset for that agent + mode and stage it. */
+  composeForPendingAgent: (modeId: string) => Promise<string | undefined>
+  /** Map a combined preset id back to its mode id, when it is one. */
+  modeIdFor: (combinedId: string) => string | undefined
+  /** Clear the pending chat context once the session has bound its preset. */
+  consumePendingAgent: () => void
+}
+
 /** Hero-chip snapshot. */
 export interface AgentPresetSeatState {
-  /** Presets the deployment supplies; empty means the chip renders nothing. */
+  /** The mode choices the deployment supplies; empty means the chip renders nothing. */
   options: readonly AgentPresetOption[]
-  /** The staged choice, empty until the roster loads. */
+  /** The staged choice (display form), empty until the roster loads. */
   current: string
   /** A rejected apply's message, cleared by the next attempt. */
   error: string | null
@@ -72,14 +96,26 @@ export class AgentPresetSeatController {
      * refresh. Optional: a harness that renders no list omits it.
      */
     private readonly onApplied?: (sessionId: string, agentPreset: string) => void,
+    /**
+     * The chat-time agent context (ui-agents), when a chat starts from an
+     * agent page: the mode pick then composes a combined preset for that
+     * agent instead of binding the bare mode.
+     */
+    private readonly agentContext?: AgentChatContext,
   ) {}
 
   private set(patch: Partial<AgentPresetSeatState>): void {
     this.store.set({ ...this.store.getSnapshot(), ...patch })
   }
 
+  /** Show a preset id in its display form (combined ids read as their mode). */
+  private displayId(actualId: string): string {
+    const mode = this.agentContext?.modeIdFor(actualId)
+    return mode ?? actualId
+  }
+
   /**
-   * Read the roster and open the chip on the deployment default.
+   * Read the mode roster and open the chip on the deployment default.
    * @returns once the snapshot reflects the host.
    */
   async load(): Promise<void> {
@@ -89,17 +125,24 @@ export class AgentPresetSeatController {
         this.set({ error: response.result.error.message })
         return
       }
-      const { presets } = response.result.value
-      this.fallback = presets.find(preset => preset.isDefault)?.id ?? presets[0]?.id ?? ''
+      const modes = response.result.value.presets.filter(preset =>
+        preset.trust === 'system' && preset.id !== META_PRESET_ID && preset.broken === undefined)
+      this.fallback = modes.find(preset => preset.isDefault)?.id ?? modes[0]?.id ?? ''
+      // A chat started from an agent page: stage the agent's default combined
+      // preset so even a user who never touches the chip binds to the agent.
+      if (this.agentContext !== undefined && this.agentContext.pendingAgent() !== undefined) {
+        const composed = await this.agentContext.composeForPendingAgent(DEFAULT_MODE_ID)
+        if (composed !== undefined) this.staged = composed
+      }
       this.set({
-        options: presetOptions(presets),
-        // Staged pick first, then the composition the current session
-        // already carries, then the deployment default. The middle term is
-        // what keeps a late-landing load from regressing the display after
-        // an applied stage was consumed — the chip mounts (and loads) only
-        // once the flow's session is current, so the reply can arrive after
-        // apply() already composed it.
-        current: this.staged ?? this.currentSession()?.agentPreset ?? this.fallback,
+        options: presetOptions(modes),
+        // Staged pick first, then the composition the current session already
+        // carries, then the deployment default. The middle term keeps a
+        // late-landing load from regressing the display after an applied
+        // stage was consumed.
+        current: this.staged === undefined
+          ? this.displayId(this.currentSession()?.agentPreset ?? this.fallback)
+          : this.displayId(this.staged),
         error: null,
       })
     } catch (error) {
@@ -108,14 +151,20 @@ export class AgentPresetSeatController {
   }
 
   /**
-   * Stage one preset for the next session, applying it immediately when a
-   * blank session is already current.
-   * @param id - the preset to stage.
+   * Stage one mode for the next session, composing it into the pending
+   * agent's combined preset when a chat starts from an agent page, and apply
+   * it immediately when a blank session is already current.
+   * @param id - the mode to stage.
    * @returns once the stage settled, and the apply too when one happened.
    */
   async select(id: string): Promise<void> {
     if (this.store.getSnapshot().busy) return
-    this.stage(id)
+    let staged = id
+    if (this.agentContext !== undefined && this.agentContext.pendingAgent() !== undefined) {
+      const composed = await this.agentContext.composeForPendingAgent(id)
+      if (composed !== undefined) staged = composed
+    }
+    this.stage(staged)
     await this.apply()
   }
 
@@ -132,7 +181,7 @@ export class AgentPresetSeatController {
    */
   stage(id: string, introduce = false): void {
     this.staged = id
-    this.set({ current: id, error: null, introduce })
+    this.set({ current: this.displayId(id), error: null, introduce })
   }
 
   /** Acknowledge the introduction cue once the chip has played it. */
@@ -167,8 +216,10 @@ export class AgentPresetSeatController {
         return
       }
       // Consumed: the next new session opens on the deployment default again.
-      this.set({ busy: false, current: response.result.value.agentPreset })
+      this.set({ busy: false, current: this.displayId(response.result.value.agentPreset) })
       this.onApplied?.(session.id, response.result.value.agentPreset)
+      // The chat bound; an agent-page start's pending context is spent.
+      this.agentContext?.consumePendingAgent()
     } catch (error) {
       this.staged = undefined
       this.set({ busy: false, error: messageOf(error), current: this.fallback })

@@ -328,6 +328,18 @@ export interface SessionsApi {
   Promise<RpcResponse<{ title: string; seq: number }>>
 
   /**
+   * Deletes a session for good: its durable artifacts are removed from
+   * persistence, the session is forgotten by every workspace account and the
+   * archive set, and `host/session-removed` is broadcast so every client drops
+   * the row. A session unknown to both the live store and persistence fails
+   * with `session-not-found`. A running session's in-memory instance is left
+   * to its own lifecycle — the deletion targets the durable record, which is
+   * what a restart or a cold read would otherwise revive.
+   */
+  remove(request: RpcRequest<{ sessionId: SessionId }>):
+  Promise<RpcResponse<{ removed: true }>>
+
+  /**
    * Sends a message. content is core's ContentBlock[] verbatim; mode maps 1:1 — queue→send, steer→steer.
    * A prompt whose content is exactly one text block starting with '/' is a slash command: the host
    * executes it through the command registry (mode-agnostic) and it is never sent to the model. A

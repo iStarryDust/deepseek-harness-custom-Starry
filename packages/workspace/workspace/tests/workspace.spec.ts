@@ -911,6 +911,40 @@ describe('registry-global session archive', () => {
     expect(storedState(result.pool).archivedSessionIds).toEqual(['stray', 'live-only'])
   })
 
+  it('forgetSession detaches the session from every account and the archive set', async () => {
+    const dir = await makeDir('forget-home')
+    const result = await harness({ sessions: [header('a', dir, 100), header('b', dir, 200)] })
+    const workspace = result.registry.list()[0]!
+    await result.registry.archiveSession(SessionId('a'))
+    await result.registry.archiveSession(SessionId('b'))
+    expect(workspace.sessionIds).toContain('a')
+
+    await result.registry.forgetSession(SessionId('a'))
+
+    expect(result.registry.archivedSessionIds).toEqual(['b'])
+    expect(workspace.sessionIds).not.toContain('a')
+    expect(storedState(result.pool).archivedSessionIds).toEqual(['b'])
+  })
+
+  it('forgetSession is idempotent for an already-forgotten id', async () => {
+    const dir = await makeDir('forget-idem')
+    const result = await harness({ sessions: [header('a', dir, 100)] })
+    const workspace = result.registry.list()[0]!
+
+    // A never-seen id writes nothing.
+    await result.registry.forgetSession(SessionId('ghost'))
+    expect(result.registry.archivedSessionIds).toEqual([])
+    expect(workspace.sessionIds).toContain('a')
+
+    await result.registry.forgetSession(SessionId('a'))
+    const changesAfterFirst = result.changes.length
+    expect(workspace.sessionIds).not.toContain('a')
+
+    // A second forget of a removed id is a no-op: no further writes.
+    await result.registry.forgetSession(SessionId('a'))
+    expect(result.changes.length).toBe(changesAfterFirst)
+  })
+
   it('propagates a persistence-listing failure instead of reporting an unknown session', async () => {
     const result = await harness({ sessions: [] })
     result.list.mockRejectedValueOnce(new Error('persistence backend down'))
