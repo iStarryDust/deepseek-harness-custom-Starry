@@ -106,50 +106,50 @@ This is an automatically generated checkpoint condensing an earlier span of the 
 
 #### 模型看到的内容
 
-摘要模型会接收逐字回放的会话：与上次已路由请求为已遮蔽区域发送的相同系统提示词、工具 schema 与消息，后面跟随一条最终 user 消息，即下方压缩指令。会话模型绝不会看到该私有请求或其推理；只有返回文本会被存储。
+摘要模型会接收逐字回放的会话：与上次已路由请求为已遮蔽区域发送的相同系统提示词、工具 schema 与消息，后面跟随一条最终 user 消息，即下方压缩指令。指令语言跟随人类用户自己的消息（role 为 'user' 且 source kind 为 'user'），忽略工具结果与生产者注入上下文等机器生成的英文：以中文为主的用户会话用中文指令（检查点以中文落地），否则使用英文指令。会话模型绝不会看到该私有请求或其推理；只有返回文本会被存储。
 
-##### 压缩指令（最终 user 消息）
+##### 压缩指令（最终 user 消息，中文会话）
 
 ```markdown
-You are now acting as a compaction engine for this AI coding assistant. Condense the conversation ABOVE into a structured checkpoint that lets another model resume the work with no loss of essential context.
+你现在是这个 AI 编程助手的压缩引擎。把上面这段对话浓缩成一个结构化的检查点，让另一个模型能在不丢失任何关键上下文的前提下接续这份工作。
 
-Output EXACTLY the Markdown structure below: keep every section, in order. Use terse bullets, not prose paragraphs. Write "(none)" for an empty section — never drop a section.
+严格按照下面的 Markdown 结构输出：保留每个小节及其顺序。使用简短的要点，不要写成段落。空的小节写"(none)"——绝不要漏掉任何小节。
 
-## Primary Request and Intent
-- [the user's original and evolving goals; quote verbatim where the exact wording matters]
+## 主要请求与意图
+- [用户的原始与不断演进的目标；当措辞本身关键时逐字引用]
 
-## Key Technical Concepts
-- [technologies, frameworks, patterns, and conventions in play]
+## 关键技术概念
+- [涉及的技术、框架、模式与约定]
 
-## Files and Code
-- [exact path: why it matters, key changes or snippets]
+## 文件与代码
+- [准确路径：为什么重要、关键改动或代码片段]
 
-## Errors and Fixes
-- [error: how it was resolved, plus any related user feedback]
+## 错误与修复
+- [错误：如何解决，以及相关的用户反馈]
 
-## Pending Jobs
-- [explicitly requested work not yet completed]
+## 待办事项
+- [尚未完成的明确请求]
 
-## Current Work
-- [precisely what was in progress at this checkpoint]
+## 当前进展
+- [本检查点时刻准确处于进行中的内容]
 
-## Next Step
-- [the single next action, directly in line with the most recent request, or "(none)"]
+## 下一步
+- [紧接的单个动作，直接对应最近的请求；没有则写"(none)"]
 
-## Critical Context
-- [decisions and their rationale, constraints, user preferences, open questions, data needed to continue]
+## 关键上下文
+- [决策及其理由、约束、用户偏好、未决问题、继续所需的数据]
 
-Rules:
-- Write concise English engineering prose. Preserve exact file paths, commands, error strings, identifiers, numeric values, function signatures, and syntax fragments.
-- Capture user feedback and explicit instructions faithfully, especially corrections.
-- Do NOT mention this summarization request or that the context was compacted.
-- Output only the checkpoint text: do not call any tool or take any other action.
-- If the conversation already contains a <compacted-summary> block, it is a PRIOR checkpoint. Do not copy it forward verbatim: preserve still-true facts, drop stale ones, and merge newer information into a single consolidated summary under the same structure.
+规则：
+- 用简体中文撰写简洁的工程要点。保留准确的路径、命令、错误字符串、标识符、数字、函数签名与语法片段原文。
+- 忠实地记录用户的反馈与明确指示，尤其是纠正意见。
+- 不要提及本次压缩请求，也不要说上下文被压缩过。
+- 只输出检查点文本：不要调用任何工具，也不要采取其他动作。
+- 如果对话里已经有 <compacted-summary> 块，那是之前的检查点。不要逐字照搬它：保留仍然成立的事实，丢弃过时的信息，并把更新的内容合并进同一结构下的单一汇总。
 ```
 
 #### Token 影响
 
-这是一次独立模型调用：输入是已回放会话前缀加固定指令，输出受 `maxTokens` 限制。收敛重试可能多次支付这项成本。
+这是一次独立模型调用：输入是已回放会话前缀加随语言匹配的指令，输出受 `maxTokens` 限制。收敛重试可能多次支付这项成本。
 
 #### KV Cache 影响
 

@@ -5,6 +5,7 @@ import BasicCompactionEngine from '@deepseek-ai/dsh-compaction-basic'
 import type { BasicCompactionConfig } from '@deepseek-ai/dsh-compaction-basic'
 import { selectCompactableRange } from '@deepseek-ai/dsh-compaction-basic/src/region.ts'
 import type { SummarizationInput, SummaryResult } from '@deepseek-ai/dsh-compaction-basic/src/summarizer.ts'
+import { detectSummaryLanguage } from '@deepseek-ai/dsh-compaction-basic/src/summarizer.ts'
 import { CompactionId, toolPairingBalancedAfter, toolPairingBalancedBefore } from '@deepseek-ai/dsh-compaction'
 import {
   resolveCompactSpec,
@@ -1205,6 +1206,7 @@ describe('default one-shot summarizer', () => {
       provider: MODEL,
       model: MODEL,
       maxTokens: 321,
+      language: 'en',
       usage: adapter.usage,
     })
     expect(adapter.lastOptions).toMatchObject({
@@ -1217,6 +1219,20 @@ describe('default one-shot summarizer', () => {
     })
     const instruction = adapter.lastOptions?.messages.at(-1)?.content[0]
     expect(instruction?.type === 'text' ? instruction.text : '').toContain('## Primary Request and Intent')
+  })
+
+  it('issues the Chinese directive for a Chinese conversation', async () => {
+    const { adapter, compact } = await summarizerHarness([{ type: 'text', text: '中文摘要' }], undefined, MODEL, {
+      auto: false,
+      summarizationProvider: MODEL,
+      summarizationModel: MODEL,
+      maxTokens: 64,
+    })
+    const session = conversation(1)
+    await compact.runSummarize(promptInput('请帮我排查这个报错。'), agent(session, 'fallback'), SIGNAL)
+    const instruction = adapter.lastOptions?.messages.at(-1)?.content[0]
+    expect(instruction?.type === 'text' ? instruction.text : '').toContain('## 主要请求与意图')
+    expect(instruction?.type === 'text' ? instruction.text : '').toContain('用简体中文撰写简洁的工程要点')
   })
 
   it('replays the conversation prefix and appends the instruction as the final message', async () => {
@@ -1876,5 +1892,43 @@ describe('automatic listener and loader composition', () => {
     await preStep(ctx, agent(session, MODEL))
     expect(session.events.some(event => event.type === 'compaction/start')).toBe(false)
     expect(await recover(ctx, agent(session, MODEL), overflow())).toBe(false)
+  })
+})
+
+describe('detectSummaryLanguage', () => {
+  // A real human user message carries source.kind 'user'; injected producer
+  // context (plugin) and tool results (tool) also ride the user role but must
+  // not count toward the detected language.
+  const message = (text: string) => createUserMessage({
+    content: [{ type: 'text', text }],
+    source: { kind: 'user' },
+  })
+
+  it('flags a predominately-Japanese/CJK surface as zh', () => {
+    expect(detectSummaryLanguage([message('请帮我排查这个报错。')])).toBe('zh')
+  })
+
+  it('treats an English surface as en', () => {
+    expect(detectSummaryLanguage([message('Please fix this error for me.')])).toBe('en')
+  })
+
+  it('keeps an English surface with a short quoted snippet as en', () => {
+    expect(detectSummaryLanguage([message('Most of this is English text "少量中文" here.')])).toBe('en')
+  })
+
+  it('returns en for an empty surface', () => {
+    expect(detectSummaryLanguage([])).toBe('en')
+  })
+
+  it('ignores injected producer and tool English so it does not dilute the user language', () => {
+    const injected = createUserMessage({
+      content: [{ type: 'text', text: 'You are an expert assistant. Reply in English.' }],
+      source: { kind: 'plugin', plugin: 'system-prompt' },
+    })
+    const toolWall = createUserMessage({
+      content: [{ type: 'text', text: 'Compiling unit tests ...\nError: test failed\nnpm ERR! code 1' }],
+      source: { kind: 'tool', callId: CallId('tool-1') },
+    })
+    expect(detectSummaryLanguage([injected, toolWall, message('请帮我排查这个报错。')])).toBe('zh')
   })
 })

@@ -106,9 +106,9 @@ Replacing rather than append-only. Each checkpoint invalidates reuse from the fi
 
 #### What the model sees
 
-The summarization model receives the conversation replayed verbatim — the same system prompt, tool schemas, and messages the last routed request sent for the shadowed region — followed by one final user message: the compaction instruction below. The conversation model never sees this private request or its reasoning; only returned text is stored.
+The summarization model receives the conversation replayed verbatim — the same system prompt, tool schemas, and messages the last routed request sent for the shadowed region — followed by one final user message: the compaction instruction below. The directive language follows the human user's own messages (role 'user' with source kind 'user'), ignoring the machine-generated English of tool results and injected producer context: a predominantly Chinese user surface gets the Chinese directive (so the checkpoint lands in Chinese), anything else the English directive shown here. The conversation model never sees this private request or its reasoning; only returned text is stored.
 
-##### Compaction instruction (final user message)
+##### Compaction instruction (final user message, English surface)
 
 ```markdown
 You are now acting as a compaction engine for this AI coding assistant. Condense the conversation ABOVE into a structured checkpoint that lets another model resume the work with no loss of essential context.
