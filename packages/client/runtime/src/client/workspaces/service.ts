@@ -101,13 +101,19 @@ export class WorkspaceRuntime implements IWorkspaces {
     // would open a session no grouping surface shows under this workspace.
     // An archived blank is never reused either: reuse would open a session
     // no grouping surface can show, so New Session mints a fresh one instead.
+    // A caller naming a preset reuses only a blank already bound to that exact
+    // preset: reusing a blank composed from another preset (e.g. the system
+    // default after a failed agent chat-start) would silently keep the session
+    // off the requested composition's history. An unrecorded preset never
+    // matches — mint a fresh session bound to the request instead.
     const archived = this.list.getSnapshot().archivedSessionIds
     const sessions = this.sessions.list.getSnapshot()
     for (const id of sessions.ids) {
       const summary = sessions.byId[id]
       if (summary !== undefined && summary.blank && summary.cwd === workspace.path
         && workspace.sessionIds.includes(summary.id)
-        && !archived.includes(summary.id)) return summary.id
+        && !archived.includes(summary.id)
+        && (agentPreset === undefined || summary.agentPreset === agentPreset)) return summary.id
     }
     const attempt = this.sessions.create({ workspaceId, ...agentPreset === undefined ? {} : { agentPreset } })
       .finally(() => { this.connecting.delete(workspaceId) })

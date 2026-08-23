@@ -275,6 +275,41 @@ describe('WorkspaceRuntime', () => {
     await expect(workspaces.connectWorkspace(wid('alpha'))).resolves.toBe('s-fresh-2')
   })
 
+  it('a preset-naming connect reuses only a blank bound to that exact preset', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    api.onWorkspaceList = () => Promise.resolve(ok({
+      items: [workspace('alpha', [sid('s-blank-default'), sid('s-blank-agent')])] as never[],
+    }))
+    api.onList = () => Promise.resolve(ok({
+      items: [
+        // Blank bound to the deployment default: must NOT satisfy a caller
+        // asking for the agent's combined preset.
+        { sessionId: sid('s-blank-default'), updatedAt: 2, running: false, blank: true, cwd: '/w/alpha', agentPreset: 'standard' },
+        // Blank already bound to the requested combined preset: the reuse hit.
+        { sessionId: sid('s-blank-agent'), updatedAt: 3, running: false, blank: true, cwd: '/w/alpha', agentPreset: 'agent-abc-standard' },
+      ] as never[],
+    }))
+    await Promise.all([workspaces.refresh(), sessions.refresh()])
+    await Promise.resolve()
+
+    // Mismatched default-bound blank is skipped; the matching agent-bound
+    // blank is reused with no create RPC.
+    await expect(workspaces.connectWorkspace(wid('alpha'), 'agent-abc-standard')).resolves.toBe('s-blank-agent')
+    expect(api.callsOf('session.create')).toEqual([])
+
+    // No blank matches the code preset → a fresh session bound to it is created.
+    api.onCreate = () => Promise.resolve(ok({ sessionId: sid('s-fresh-code') }))
+    await expect(workspaces.connectWorkspace(wid('alpha'), 'agent-abc-code')).resolves.toBe('s-fresh-code')
+    expect(api.callsOf('session.create')).toEqual([{ workspaceId: 'alpha', agentPreset: 'agent-abc-code' }])
+
+    // A caller naming no preset keeps reusing any blank (legacy behavior).
+    await expect(workspaces.connectWorkspace(wid('alpha'))).resolves.toBe('s-blank-default')
+    expect(api.callsOf('session.create')).toHaveLength(1)
+  })
+
   it('a rejected first prompt keeps the blank session eligible for connectWorkspace reuse', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()

@@ -155,7 +155,7 @@ export function apply(ctx: ClientContext): void {
       load: () => controller.load(),
       selectAgent: (id: string) => { void controller.selectAgent(id) },
       back: () => { controller.back() },
-      startChat: (id: string) => { void controller.startChat(id) },
+      startChat: (id: string) => controller.startChat(id),
       openSession: (sessionId: string) => { controller.openSession(sessionId) },
       openProfile: (id: string) => controller.openProfile(id),
       toggleCollapsed: () => { controller.toggleCollapsed() },

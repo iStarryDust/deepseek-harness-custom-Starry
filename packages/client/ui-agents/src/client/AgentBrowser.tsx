@@ -27,6 +27,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { AgentForm } from './AgentForm.tsx'
 import type { AgentFormInput } from './stores.ts'
 import type { AgentBrowserState, AgentSessionEntry } from './stores.ts'
+import type { AgentsKey } from './locales.ts'
 import css from './AgentBrowser.module.css'
 
 /** Registration-side business face for the agent browser. */
@@ -43,8 +44,8 @@ export interface AgentBrowserInjected {
   selectAgent: (id: string) => void
   /** Return to the roster page. */
   back: () => void
-  /** Start a new chat with one agent. */
-  startChat: (id: string) => void
+  /** Start a new chat with one agent; resolves to a failure message when the chat could not start. */
+  startChat: (id: string) => Promise<string | undefined>
   /** Open one chat from the agent's history. */
   openSession: (sessionId: string) => void
   /** Open one agent's profile for editing. */
@@ -211,7 +212,7 @@ export function AgentBrowser({
             <button
               type="button"
               className={css.action}
-              onClick={() => { startChat(selected) }}
+              onClick={() => { void startChat(selected) }}
             >
               {t('agents.newChat')}
             </button>
@@ -223,6 +224,8 @@ export function AgentBrowser({
               {t('agents.profile')}
             </button>
           </div>
+          {/* A local key translates; a raw wire message (not a key) falls back to itself. */}
+          {state.error !== null && <div className={css.error} role="alert">{t(state.error as AgentsKey)}</div>}
         </div>
 
         <div className={css.sectionHeader}>

@@ -35,6 +35,7 @@ export const zh = {
   'chat.delete.title': '删除聊天记录',
   'chat.delete.desc': '将永久删除该聊天记录及其日志文件，此操作不可恢复。',
   'chat.delete.confirm': '删除',
+  'chat.startFailed': '无法为这个 Agent 组合对话预设，请重试',
   'cancel': '取消',
   'close': '关闭',
 } satisfies Record<string, string>
@@ -77,6 +78,7 @@ export const en = {
   'chat.delete.title': 'Delete Chat',
   'chat.delete.desc': 'This permanently deletes the chat and its log files. This cannot be undone.',
   'chat.delete.confirm': 'Delete',
+  'chat.startFailed': 'Could not compose a chat preset for this agent; please retry',
   'cancel': 'Cancel',
   'close': 'Close',
 } satisfies Record<AgentsKey, string>

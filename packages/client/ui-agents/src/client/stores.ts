@@ -360,7 +360,10 @@ export class AgentBrowserController {
       }
       await this.load()
       this.set({ busy: false, view: 'agent', selected: id })
-      void this.startChat(id)
+      // The agent exists even when the first chat could not be composed; the
+      // failure is reported on the agent page instead of rolling back the create.
+      const chatFailure = await this.startChat(id)
+      if (chatFailure !== undefined) return chatFailure
       return undefined
     } catch (error) {
       const message = messageOf(error)
@@ -439,12 +442,25 @@ export class AgentBrowserController {
    * create, which would otherwise leave the session on the deployment
    * default. The hero's mode pick can still swap the composition while the
    * session is blank. The agent is also recorded as the pending chat context.
+   *
+   * A composition failure is surfaced, never swallowed: starting the session
+   * anyway would silently bind it to the deployment default and hide it from
+   * this agent's chat history.
    * @param id - the agent to chat with.
+   * @returns a failure message when the combined preset could not be
+   * composed (the chat was NOT started), or undefined on success.
    */
-  async startChat(id: string): Promise<void> {
+  async startChat(id: string): Promise<WireFailure> {
     this.pending = id
     const composed = await this.ensureCombined(id, 'standard')
+    if (composed === undefined) {
+      this.pending = undefined
+      const message = 'chat.startFailed'
+      this.set({ error: message, busy: false })
+      return message
+    }
     void this.ctx.workspaces.startSession(undefined, composed)
+    return undefined
   }
 
   /**

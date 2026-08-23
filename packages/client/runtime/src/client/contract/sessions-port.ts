@@ -16,6 +16,8 @@ export interface SessionsPortSummary {
   /** Empty-log bit (blank sessions are reused by New Session instead of minting another). */
   blank: boolean
   cwd?: string
+  /** The agent preset the session runs under, when recorded; blank-reuse must respect it. */
+  agentPreset?: string
   updatedAt: number
 }
 

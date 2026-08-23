@@ -23,6 +23,13 @@ export function ConversationRoot({
   const inputState = useInput(s => s)
   const cwd = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.cwd)
   const summaryBlank = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.blank)
+  // An agent-bound blank session is a chat with that agent, not a build
+  // prompt: its hero placeholder reads as a message to the agent. Ordinary
+  // sessions keep the build-oriented hero copy. A combined preset id
+  // (`<agentId>-standard|code|minimal`) marks an agent-bound session; the
+  // bare system presets never carry the dash suffix.
+  const agentPreset = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.agentPreset)
+  const agentBound = agentPreset !== undefined && /-(standard|code|minimal)$/.test(agentPreset)
   const workspaces = useWorkspaces(s => s)
   // A plugin this package cannot import (ui-model-selection) says this session cannot
   // send; its reason is already localized by whoever raised it.
@@ -147,7 +154,7 @@ export function ConversationRoot({
         // block keeps the model seat live because choosing a model is how the
         // user clears it.
         ? { blocked: composerBlock, placeholder: composerBlock.reason }
-        : hero ? { placeholder: t('placeholder.hero') } : {}),
+        : hero ? { placeholder: agentBound ? t('placeholder.default') : t('placeholder.hero') } : {}),
     overlay: renderSlot('conversation.input.overlay', {}),
     leftItems: zone === undefined ? null : renderSlot('conversation.input.left', zone),
     rightItems: zone === undefined ? null : renderSlot('conversation.input.right', zone),
