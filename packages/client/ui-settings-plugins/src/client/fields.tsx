@@ -121,3 +121,116 @@ export function SecretField(props: Pick<FieldProps, 'id' | 'label' | 'hint' | 't
     </div>
   )
 }
+
+/** What a switch control needs beyond a boolean value. */
+export interface SwitchProps {
+  /** Stable id associating the label with its control. */
+  id: string
+  /** Visible label. */
+  label: string
+  /** One-line explanation rendered under the control. */
+  hint: string
+  /** Whether the switch is on. */
+  checked: boolean
+  /** True when saving would leave a user-layer entry for this field. */
+  overridden: boolean
+  /** Copy for the overridden badge. */
+  overriddenLabel: string
+  /** Copy for the reset control. */
+  resetLabel: string
+  /** Disables every control (read-only document, or an unavailable namespace). */
+  disabled: boolean
+  /** Toggle the boolean draft. */
+  onToggle: (next: boolean) => void
+  /** Stage a clear so the field re-inherits the composition layer. */
+  onReset: () => void
+}
+
+/**
+ * A staged boolean switch. The control renders `checked` from the field's
+ * draft text; toggling stages `'true'`/`'false'` through the card's edit glue.
+ * @param props - the field's copy, its boolean draft, and the toggle actions.
+ * @returns the labelled switch.
+ */
+export function SwitchField(props: SwitchProps) {
+  return (
+    <div className={css.field}>
+      <div className={css.head}>
+        <label className={css.label} htmlFor={props.id}>{props.label}</label>
+        {props.overridden
+          ? (
+            <span className={css.badges}>
+              <span className={css.badge}>{props.overriddenLabel}</span>
+              <button
+                type="button"
+                className={css.reset}
+                disabled={props.disabled}
+                onClick={props.onReset}
+              >
+                {props.resetLabel}
+              </button>
+            </span>
+          )
+          : null}
+      </div>
+      <button
+        id={props.id}
+        type="button"
+        role="switch"
+        aria-checked={props.checked}
+        className={props.checked ? css.switchOn : css.switch}
+        disabled={props.disabled}
+        onClick={() => { props.onToggle(!props.checked) }}
+      >
+        <span className={css.knob} />
+        {props.checked ? 'ON' : 'OFF'}
+      </button>
+      <p className={css.hint}>{props.hint}</p>
+    </div>
+  )
+}
+
+/**
+ * A staged multi-line value field (e.g. request headers as JSON text).
+ * @param props - the field's copy, its staged text, and the edit actions.
+ * @returns the labelled textarea.
+ */
+export function TextAreaField(props: FieldProps & {
+  /** Placeholder shown while the draft is empty. */
+  placeholder?: string
+}) {
+  return (
+    <div className={css.field}>
+      <div className={css.head}>
+        <label className={css.label} htmlFor={props.id}>{props.label}</label>
+        {props.overridden
+          ? (
+            <span className={css.badges}>
+              <span className={css.badge}>{props.overriddenLabel}</span>
+              <button
+                type="button"
+                className={css.reset}
+                disabled={props.disabled}
+                onClick={props.onReset}
+              >
+                {props.resetLabel}
+              </button>
+            </span>
+          )
+          : null}
+      </div>
+      <textarea
+        id={props.id}
+        className={props.invalid ? css.textareaInvalid : css.textarea}
+        rows={6}
+        value={props.text}
+        placeholder={props.placeholder ?? ''}
+        disabled={props.disabled}
+        onChange={(event) => { props.onEdit(event.target.value) }}
+      />
+      <p className={props.invalid ? css.invalid : css.hint}>
+        {props.invalid ? props.invalidLabel : props.hint}
+      </p>
+    </div>
+  )
+}

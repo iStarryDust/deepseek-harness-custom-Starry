@@ -153,6 +153,12 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
       async pickDirectory(request) {
         return { rpcId: request.rpcId, result: { ok: true, value: { path: null } } }
       },
+      async browserProbe(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: { installed: false } } }
+      },
+      async browserInstall(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: { ok: true } } }
+      },
       async listDirectory(request) {
         return { rpcId: request.rpcId, result: { ok: true, value: { path: '/w', home: '/w', crumbs: [{ name: '/', path: '/', hidden: false }], entries: [], truncated: false } } }
       },

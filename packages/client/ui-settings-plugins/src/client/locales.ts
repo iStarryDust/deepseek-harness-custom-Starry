@@ -11,6 +11,10 @@ export type PluginsSettingsLocaleKey =
   | 'webSearchTitle' | 'webSearchDescription'
   | 'webSearchApiKey' | 'webSearchApiKeyHint' | 'webSearchApiKeySet' | 'webSearchApiKeyUnset'
   | 'webSearchBaseUrl' | 'webSearchBaseUrlHint' | 'webSearchMaxUses' | 'webSearchMaxUsesHint'
+  | 'browserTitle' | 'browserDescription' | 'browserInstallTitle' | 'browserInstall'
+  | 'browserInstallHint' | 'browserInstalling' | 'browserInstalled' | 'browserProbing'
+  | 'browserAgentUse' | 'browserAgentUseHint' | 'browserRequestHeaders' | 'browserRequestHeadersHint'
+  | 'browserResetHeaders'
 
 /** English copy. */
 export const en: Record<PluginsSettingsLocaleKey, string> = {
@@ -51,6 +55,19 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   webSearchBaseUrlHint: 'Leave blank to use the provider default.',
   webSearchMaxUses: 'Max searches per request',
   webSearchMaxUsesHint: 'How many times one request may search before it must answer.',
+  browserTitle: 'Built-in browser',
+  browserDescription: 'A Chromium browser the agent can drive.',
+  browserInstallTitle: 'Built-in browser install',
+  browserInstall: 'Install browser',
+  browserInstalling: 'Installing…',
+  browserInstalled: 'Installed',
+  browserProbing: 'Checking…',
+  browserInstallHint: 'Installs a Chromium under ~/.dsh/browser. The agent uses it only when enabled below.',
+  browserAgentUse: 'Enable the built-in browser for the agent',
+  browserAgentUseHint: 'When on, the agent may open pages with the built-in browser.',
+  browserRequestHeaders: 'Request headers',
+  browserRequestHeadersHint: 'JSON object applied as extra headers when the built-in browser navigates.',
+  browserResetHeaders: 'Restore defaults',
 }
 
 /** Simplified Chinese copy. */
@@ -92,4 +109,17 @@ export const zh: Record<PluginsSettingsLocaleKey, string> = {
   webSearchBaseUrlHint: '留空则使用提供方默认地址。',
   webSearchMaxUses: '单次请求最多搜索次数',
   webSearchMaxUsesHint: '一次请求在必须作答前最多可以搜索多少次。',
+  browserTitle: '内置浏览器',
+  browserDescription: '一个 agent 可驱动的 Chrome/Edge 内核浏览器。',
+  browserInstallTitle: '内置浏览器安装',
+  browserInstall: '安装内置浏览器',
+  browserInstalling: '安装中…',
+  browserInstalled: '已安装',
+  browserProbing: '检测中…',
+  browserInstallHint: '把 Chromium 安装到 ~/.dsh/browser。启用下方开关后 agent 才会使用它。',
+  browserAgentUse: '允许 agent 使用内置浏览器',
+  browserAgentUseHint: '开启后，agent 可以用内置浏览器打开网页。',
+  browserRequestHeaders: '请求头',
+  browserRequestHeadersHint: '内置浏览器导航时附加的请求头（JSON 对象）。',
+  browserResetHeaders: '恢复默认值',
 }

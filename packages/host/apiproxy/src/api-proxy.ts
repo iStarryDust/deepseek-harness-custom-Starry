@@ -2969,6 +2969,61 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       async openPath(request, signal) {
         return openPath(request, request.payload.path, signal)
       },
+
+      async browserProbe(request) {
+        const runtime = ctx.get('browser') as {
+          detect(): Promise<{ installed: boolean; path?: string }>
+          install(): Promise<{ ok: boolean; output?: string; error?: string }>
+        } | undefined
+        if (runtime === undefined) {
+          return err(request, {
+            code: 'browser-unavailable',
+            message: '内置浏览器插件未加载',
+            details: {},
+          })
+        }
+        try {
+          const result = await runtime.detect()
+          return ok(request, {
+            installed: result.installed,
+            ...result.path !== undefined ? { path: result.path } : {},
+          })
+        } catch (error) {
+          return err(request, {
+            code: 'browser-unavailable',
+            message: `内置浏览器检测失败：${error instanceof Error ? error.message : String(error)}`,
+            details: {},
+          })
+        }
+      },
+
+      async browserInstall(request) {
+        const runtime = ctx.get('browser') as {
+          detect(): Promise<{ installed: boolean; path?: string }>
+          install(): Promise<{ ok: boolean; output?: string; error?: string }>
+        } | undefined
+        if (runtime === undefined) {
+          return err(request, {
+            code: 'browser-unavailable',
+            message: '内置浏览器插件未加载',
+            details: {},
+          })
+        }
+        try {
+          const result = await runtime.install()
+          return ok(request, {
+            ok: result.ok,
+            ...result.output !== undefined ? { output: result.output } : {},
+            ...result.error !== undefined ? { error: result.error } : {},
+          })
+        } catch (error) {
+          return err(request, {
+            code: 'browser-unavailable',
+            message: `内置浏览器安装失败：${error instanceof Error ? error.message : String(error)}`,
+            details: {},
+          })
+        }
+      },
     },
 
     goals: {

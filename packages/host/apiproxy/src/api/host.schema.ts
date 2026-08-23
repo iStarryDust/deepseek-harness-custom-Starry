@@ -73,3 +73,22 @@ export const hostOpenPathRequestSchema = z.object({
 export const hostOpenPathValueSchema = z.object({
   opened: z.literal(true),
 }) satisfies z.ZodType<Wire<ResponseValue<'host.openPath'>>>
+
+/** host.browserProbe request payload (empty object literal). */
+export const hostBrowserProbeRequestSchema = z.object({}) satisfies z.ZodType<Wire<RequestPayload<'host.browserProbe'>>>
+
+/** host.browserProbe response value. */
+export const hostBrowserProbeValueSchema = z.object({
+  installed: z.boolean(),
+  path: z.string().optional(),
+}) satisfies z.ZodType<Wire<ResponseValue<'host.browserProbe'>>>
+
+/** host.browserInstall request payload (empty object literal). */
+export const hostBrowserInstallRequestSchema = z.object({}) satisfies z.ZodType<Wire<RequestPayload<'host.browserInstall'>>>
+
+/** host.browserInstall response value. */
+export const hostBrowserInstallValueSchema = z.object({
+  ok: z.boolean(),
+  output: z.string().optional(),
+  error: z.string().optional(),
+}) satisfies z.ZodType<Wire<ResponseValue<'host.browserInstall'>>>

@@ -78,6 +78,7 @@ pnpm dsh web
 | persona 行 | 人格 + 语言指令 + 运行时模板 | 语言指令 + 工作目录行 + 人格原文 |
 | `session.remove` | 注入 bug | **已修复** |
 | 设置页 Agent 预设入口 | 默认行 + 管理分区 | 收归侧边栏 Agent 名单 |
+| `packages/web/browser` | — | **新增**：内置浏览器插件（Playwright Chromium 安装于 `~/.dsh/browser`；Agent 通过 `browser_open` / `browser_interact` 打开并操作网页） |
 
 并继承上游 `0.1.1-rc.2` 的全部能力——含 **统一图像请求管线**（规范化附件、路由级请求版本、DeepSeek Files 生命周期）。
 

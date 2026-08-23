@@ -146,6 +146,26 @@ export function textField(field: string): CardFieldSpec {
 }
 
 /**
+ * A boolean field. A switch control stages the text `'true'` or `'false'`; a
+ * value that is neither is treated as `false`, so the two-state control stays
+ * usable.
+ * @param field - field name inside the namespace section.
+ * @returns the field's conversion spec.
+ */
+export function booleanField(field: string): CardFieldSpec {
+  return {
+    field,
+    format: value => value === true ? 'true' : 'false',
+    parse: (text) => {
+      const trimmed = text.trim()
+      return trimmed === 'true'
+        ? { kind: 'set', value: true }
+        : { kind: 'set', value: false }
+    },
+  }
+}
+
+/**
  * Stages one card's edits over one settings namespace and writes them on save.
  *
  * The form publishes through a snapshot store because slot components read

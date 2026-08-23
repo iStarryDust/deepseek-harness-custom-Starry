@@ -57,6 +57,7 @@ This is a customized fork of [DeepSeek Harness](https://github.com/deepseek-ai/d
 | Persona row | persona + language + runtime template | language instruction + working-directory line + persona text |
 | `session.remove` | injected bug | **fixed** |
 | Settings agent-preset entry | default row + management section | moved into the sidebar agent list |
+| `packages/web/browser` | — | **New**: built-in browser plugin (Playwright Chromium under `~/.dsh/browser`; the agent opens and interacts with pages via `browser_open` / `browser_interact`) |
 
 It also inherits everything from upstream `0.1.1-rc.2` — including the **unified image request pipeline** (normalized attachments, route-owned request versions, DeepSeek Files lifecycle).
 

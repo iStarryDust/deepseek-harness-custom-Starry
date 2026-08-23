@@ -95,4 +95,23 @@ export interface HostApi {
     request: RpcRequest<{ path: string }>,
     signal: AbortSignal,
   ): Promise<RpcResponse<{ opened: true }>>
+
+  /**
+   * Probe whether the built-in browser (a Chromium under `~/.dsh/browser`) is installed.
+   * An empty payload uses the literal `{}`.
+   */
+  browserProbe(request: RpcRequest<{}>): Promise<RpcResponse<{
+    installed: boolean
+    path?: string
+  }>>
+
+  /**
+   * Install the built-in browser (a Chromium under `~/.dsh/browser`). The
+   * install is idempotent: an existing install leaves the files in place.
+   */
+  browserInstall(request: RpcRequest<{}>): Promise<RpcResponse<{
+    ok: boolean
+    output?: string
+    error?: string
+  }>>
 }

@@ -118,6 +118,10 @@ export class FakeApiClient implements IApiClient {
     () => Promise.resolve(ok({ path: null }))
   onOpenPath: (payload: unknown) => Promise<RpcResponse<{ opened: true }>> =
     () => Promise.resolve(ok({ opened: true as const }))
+  onBrowserProbe: (payload: unknown) => Promise<RpcResponse<{ installed: boolean; path?: string }>> =
+    () => Promise.resolve(ok({ installed: false }))
+  onBrowserInstall: (payload: unknown) => Promise<RpcResponse<{ ok: boolean; output?: string; error?: string }>> =
+    () => Promise.resolve(ok({ ok: true }))
 
   onListDirectory: (payload: unknown) => Promise<RpcResponse<{
     path: string
@@ -182,6 +186,8 @@ export class FakeApiClient implements IApiClient {
     listDirectory: (payload: unknown) => this.record('host.listDirectory', payload, this.onListDirectory(payload)),
     createDirectory: (payload: unknown) => this.record('host.createDirectory', payload, this.onCreateDirectory(payload)),
     openPath: (payload: unknown) => this.record('host.openPath', payload, this.onOpenPath(payload)),
+    browserProbe: (payload: unknown) => this.record('host.browserProbe', payload, this.onBrowserProbe(payload)),
+    browserInstall: (payload: unknown) => this.record('host.browserInstall', payload, this.onBrowserInstall(payload)),
   }
 
   // The archive-set field defaults at the binding below so list stubs keep
