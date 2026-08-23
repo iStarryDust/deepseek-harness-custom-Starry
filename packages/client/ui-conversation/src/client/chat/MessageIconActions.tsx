@@ -29,11 +29,17 @@ export interface MessageIconActionsProps {
   branchUnavailable?: boolean | undefined
   /** Parent layout class composed onto the actions row. */
   className?: string | undefined
-  /**
-   * Slot-rendered actions owned by independent plugins, placed between the
+  /** Slot-rendered actions owned by independent plugins, placed between the
    * built-in copy and branch controls.
    */
   extraActions?: ReactNode
+  /**
+   * Additional meta-row content rendered between the clock and the run
+   * statistics (the `conversation.chat.turnTailMeta` seat for turn-tail; user
+   * rows never pass it). Stays outside the hover-revealed clock spans so the
+   * contributed icon controls remain visible like the copy/branch chrome.
+   */
+  clockMeta?: ReactNode | undefined
   /** The owning view's locale seat, passed down as a plain prop. */
   t: ChatViewSlotProps['t']
 }
@@ -45,7 +51,7 @@ export interface MessageIconActionsProps {
  */
 export function MessageIconActions({
   text, time, runMs, ttftMs, tokensPerSecond, clock, onBranch, branchUnavailable = false, className,
-  extraActions, t,
+  extraActions, clockMeta, t,
 }: MessageIconActionsProps) {
   const day = useCalendarDay()
   const reasonId = useId()
@@ -78,34 +84,41 @@ export function MessageIconActions({
   // The dot is decorative and stays hidden, but its margins separate the
   // readings only on screen: without the flanking spaces a reader hears one
   // run-on string ("Ran for 13sTTFT 0.2s12 tok/s") instead of three facts.
-  const clockEl = time === undefined ? null : (
-    <span className={clock === 'start' ? css.timeStart : css.timeEnd}>
-      {formatMessageClock(time, t, day)}
-      {runMs !== undefined && (
-        <>
-          {' '}
-          <span className={css.runTimeDot} aria-hidden>·</span>
-          {' '}
-          {t('message.ranFor', { duration: formatRunDuration(runMs, t) })}
-        </>
+  // Turn-tail contributed controls (clockMeta) render BEFORE the whole clock
+  // label, so the time/statistics sequence stays one uninterrupted reading.
+  const clockEl = (
+    <>
+      {clockMeta}
+      {time !== undefined && (
+        <span className={clock === 'start' ? css.timeStart : css.timeEnd}>
+          {formatMessageClock(time, t, day)}
+          {runMs !== undefined && (
+            <>
+              {' '}
+              <span className={css.runTimeDot} aria-hidden>·</span>
+              {' '}
+              {t('message.ranFor', { duration: formatRunDuration(runMs, t) })}
+            </>
+          )}
+          {ttftMs !== undefined && (
+            <>
+              {' '}
+              <span className={css.runTimeDot} aria-hidden>·</span>
+              {' '}
+              {t('message.ttft', { seconds: formatLatencySeconds(ttftMs) })}
+            </>
+          )}
+          {tokensPerSecond !== undefined && (
+            <>
+              {' '}
+              <span className={css.runTimeDot} aria-hidden>·</span>
+              {' '}
+              {t('message.tokensPerSecond', { tps: formatTokensPerSecond(tokensPerSecond) })}
+            </>
+          )}
+        </span>
       )}
-      {ttftMs !== undefined && (
-        <>
-          {' '}
-          <span className={css.runTimeDot} aria-hidden>·</span>
-          {' '}
-          {t('message.ttft', { seconds: formatLatencySeconds(ttftMs) })}
-        </>
-      )}
-      {tokensPerSecond !== undefined && (
-        <>
-          {' '}
-          <span className={css.runTimeDot} aria-hidden>·</span>
-          {' '}
-          {t('message.tokensPerSecond', { tps: formatTokensPerSecond(tokensPerSecond) })}
-        </>
-      )}
-    </span>
+    </>
   )
   return (
     <div className={className === undefined ? css.actions : `${css.actions} ${className}`}>

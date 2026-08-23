@@ -6,7 +6,7 @@ import { assistantText } from './turn-assistant.ts'
 import css from './TurnTailNodeView.module.css'
 
 type TurnTailNodeViewProps = ChatNodeViewProps<'turn-tail'>
-  & PropsRenderSlots<'conversation.chat.turnTail' | 'conversation.chat.assistant-actions'>
+  & PropsRenderSlots<'conversation.chat.turnTail' | 'conversation.chat.assistant-actions' | 'conversation.chat.turnTailMeta'>
 
 /** Turn-local actions and feature tail over the Location index, independent of Assistant placement. */
 export const TurnTailNodeView = memo(function TurnTailNodeView({
@@ -32,6 +32,9 @@ export const TurnTailNodeView = memo(function TurnTailNodeView({
   const assistantActions = messageId === undefined
     ? null
     : renderSlot('conversation.chat.assistant-actions', { messageId })
+  // Contributed meta controls sit between the closing clock and the run
+  // statistics (compact/memory buttons), on the same settled-turn row.
+  const metaActions = renderSlot('conversation.chat.turnTailMeta', {})
   return (
     <div className={css.root} data-turn-tail={data.turn} data-time-hover-root>
       {tail}
@@ -46,6 +49,7 @@ export const TurnTailNodeView = memo(function TurnTailNodeView({
         branchUnavailable={data.branchUnavailable || hasLaterChatNode}
         className={css.actions}
         extraActions={assistantActions}
+        clockMeta={metaActions}
         t={t}
       />
     </div>

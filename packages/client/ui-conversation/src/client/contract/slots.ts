@@ -151,6 +151,16 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       owner: AssistantActionOwnerProps
     }
     /**
+     * One small icon action in the turn-tail row, rendered between the
+     * closing message clock and its run statistics (the additive way to put a
+     * per-turn control on the settled meta line without replacing the row).
+     * Entries render by ascending `order`; copy/feedback/branch chrome stays
+     * owned by the turn entry, and the clock/stats halves keep their own
+     * hover-reveal behavior. The owner passes nothing: a control needs the
+     * framework session kit and its own inject face.
+     */
+    'conversation.chat.turnTailMeta': { kind: 'list'; scope: 'session'; owner: TurnTailMetaOwnerProps }
+    /**
      * The body of the details panel for the tool call the user selected —
      * one occupant, so taking it means rendering every tool's output, not just
      * the ones you know. The owner passes a frozen `block` whose two lifecycle
@@ -314,6 +324,13 @@ export interface ConversationSessionOwnerProps {
 
 /** Header actions derive their state from the standard session/global kit. */
 export interface ConversationHeaderActionOwnerProps {}
+
+/**
+ * Owner share of the turn-tail meta seat: empty by contract, like the header
+ * action row — a control derives everything it needs from the framework
+ * session kit and its own inject face.
+ */
+export interface TurnTailMetaOwnerProps {}
 
 /** Plain breadcrumb data handed to the optional lineage renderer. */
 export interface ConversationHeaderLineageOwnerProps {

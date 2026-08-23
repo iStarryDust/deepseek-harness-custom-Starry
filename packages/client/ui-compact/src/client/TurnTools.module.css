@@ -1,0 +1,66 @@
+/* Turn-tail meta controls: icon buttons matching the copy/branch chrome, with
+   short-lived inline result copy beside them. */
+
+.tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  border: none;
+  border-radius: 28px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+}
+
+.action:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.action[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: compact-spin 800ms linear infinite;
+}
+
+@keyframes compact-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Inline outcome copy (failure / reserved notice). */
+.failed,
+.note {
+  font-size: 13px;
+  line-height: 24px;
+  white-space: nowrap;
+  max-width: 480px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.failed {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.note {
+  color: var(--dsw-alias-label-tertiary);
+}

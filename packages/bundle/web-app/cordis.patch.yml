@@ -274,6 +274,11 @@
     - id: ui-message-feedback
       name: '@deepseek-ai/dsh-client-ui-message-feedback'
 
+    # Turn-tail meta controls: the compact-messages trigger over the host
+    # /compact command chain, plus the reserved memory entry.
+    - id: ui-compact
+      name: '@deepseek-ai/dsh-client-ui-compact'
+
     # Model selection: the /model popupSelect + composer seat over session.models.
     - id: ui-model-selection
       name: '@deepseek-ai/dsh-client-ui-model-selection'
