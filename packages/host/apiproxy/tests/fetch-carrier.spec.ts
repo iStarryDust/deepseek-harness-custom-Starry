@@ -240,6 +240,32 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
         return { rpcId: request.rpcId, result: { ok: true, value: { skills: [{ name: 'commit-helper', description: 'Git commits', modelInvocable: true }] } } }
       },
     },
+    agentMemory: {
+      readGlobal(request: RpcRequest<{}>) {
+        return Promise.resolve({ rpcId: request.rpcId, result: { ok: true as const, value: { text: '' } } })
+      },
+      writeGlobal(request: RpcRequest<{ text: string }>) {
+        return Promise.resolve({ rpcId: request.rpcId, result: { ok: true as const, value: {} } })
+      },
+      readAgent(request: RpcRequest<{ agentId: string }>) {
+        return Promise.resolve({
+          rpcId: request.rpcId,
+          result: { ok: true as const, value: { agentId: request.payload.agentId, text: '' } },
+        })
+      },
+      writeAgent(request: RpcRequest<{ agentId: string; text: string }>) {
+        return Promise.resolve({
+          rpcId: request.rpcId,
+          result: { ok: true as const, value: { agentId: request.payload.agentId } },
+        })
+      },
+      remember(request: RpcRequest<{ sessionId: string; text: string }>) {
+        return Promise.resolve({
+          rpcId: request.rpcId,
+          result: { ok: true as const, value: { saved: true, agentId: 'agent-stub', outcome: 'remembered 1 entry' } },
+        })
+      },
+    },
     goals: {
       async create(request) {
         return { rpcId: request.rpcId, result: { ok: false, error: { code: 'internal', message: 'stub', details: {} } } }

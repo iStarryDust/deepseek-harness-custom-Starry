@@ -256,6 +256,19 @@ export class FakeApiClient implements IApiClient {
       this.record('agentPreset.remove', payload, Promise.resolve(ok({}))),
   }
 
+  readonly agentMemory: IApiClient['agentMemory'] = {
+    readGlobal: (payload: unknown) =>
+      this.record('agentMemory.readGlobal', payload, Promise.resolve(ok({ text: '' }))),
+    writeGlobal: (payload: { text: string }) =>
+      this.record('agentMemory.writeGlobal', payload, Promise.resolve(ok({}))),
+    readAgent: (payload: { agentId: string }) =>
+      this.record('agentMemory.readAgent', payload, Promise.resolve(ok({ agentId: payload.agentId, text: '' }))),
+    writeAgent: (payload: { agentId: string; text: string }) =>
+      this.record('agentMemory.writeAgent', payload, Promise.resolve(ok({ agentId: payload.agentId }))),
+    remember: (payload: { sessionId: string; text: string }) =>
+      this.record('agentMemory.remember', payload, Promise.resolve(ok({ saved: true, agentId: 'agent-stub' }))),
+  }
+
   readonly skills: IApiClient['skills'] = {
     list: (payload: unknown) => this.record('skill.list', payload, this.onSkillList(payload)),
   }

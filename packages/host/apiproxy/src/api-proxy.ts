@@ -961,6 +961,15 @@ function noRoster(agentPreset: string): RpcError {
   }
 }
 
+/** The memory plugin is absent: an editor shows why rather than faking it. */
+function memoryUnavailable<T>(request: import('./api/rpc.ts').RpcRequest<unknown>): import('./api/rpc.ts').RpcResponse<T> {
+  return err(request, {
+    code: 'agent-memory-unavailable',
+    message: 'the agent-memory plugin is not mounted on this deployment',
+    details: {},
+  }) as import('./api/rpc.ts').RpcResponse<T>
+}
+
 /** Map one authoring/roster failure onto its wire code. */
 function presetError(agentPreset: string, error: unknown): RpcError {
   if (error instanceof UnknownPresetError) {
@@ -3247,6 +3256,47 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           return ok(request, {})
         } catch (error: unknown) {
           return err(request, presetError(agentPreset, error))
+        }
+      },
+    },
+
+    agentMemory: {
+      async readGlobal(request) {
+        const memory = ctx.get('agentMemory')
+        if (memory === undefined) return memoryUnavailable(request)
+        return ok(request, { text: memory.readGlobal() })
+      },
+
+      async writeGlobal(request) {
+        const memory = ctx.get('agentMemory')
+        if (memory === undefined) return memoryUnavailable(request)
+        memory.writeGlobal(request.payload.text)
+        return ok(request, {})
+      },
+
+      async readAgent(request) {
+        const memory = ctx.get('agentMemory')
+        if (memory === undefined) return memoryUnavailable(request)
+        return ok(request, { agentId: request.payload.agentId, text: memory.readAgent(request.payload.agentId) })
+      },
+
+      async writeAgent(request) {
+        const memory = ctx.get('agentMemory')
+        if (memory === undefined) return memoryUnavailable(request)
+        memory.writeAgent(request.payload.agentId, request.payload.text)
+        return ok(request, { agentId: request.payload.agentId })
+      },
+
+      async remember(request) {
+        const memory = ctx.get('agentMemory')
+        if (memory === undefined) return memoryUnavailable(request)
+        const found = await agentFor(request.payload.sessionId)
+        if ('error' in found) return err(request, found.error)
+        try {
+          const value = await memory.remember(found.agent, request.payload.text)
+          return ok(request, value)
+        } catch (error: unknown) {
+          return err(request, { code: 'internal', message: String(error), details: {} })
         }
       },
     },

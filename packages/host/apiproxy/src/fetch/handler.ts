@@ -52,6 +52,13 @@ import {
   agentPresetSelectRequestSchema, agentPresetUpdateRequestSchema,
 } from '../api/agent-presets.schema.ts'
 import {
+  agentMemoryReadAgentRequestSchema,
+  agentMemoryReadGlobalRequestSchema,
+  agentMemoryRememberRequestSchema,
+  agentMemoryWriteAgentRequestSchema,
+  agentMemoryWriteGlobalRequestSchema,
+} from '../api/agent-memory.schema.ts'
+import {
   goalCreateRequestSchema,
   goalEditRequestSchema,
   goalPauseRequestSchema,
@@ -131,6 +138,11 @@ const UNARY_ROUTES: UnaryRoutes = {
   'agentPreset.update': { schema: agentPresetUpdateRequestSchema, invoke: (api, r) => api.agentPresets.update(r) },
   'agentPreset.openDocument': { schema: agentPresetOpenDocumentRequestSchema, invoke: (api, r, signal) => api.agentPresets.openDocument(r, signal) },
   'agentPreset.remove': { schema: agentPresetRemoveRequestSchema, invoke: (api, r) => api.agentPresets.remove(r) },
+  'agentMemory.readGlobal': { schema: agentMemoryReadGlobalRequestSchema, invoke: (api, r) => api.agentMemory.readGlobal(r) },
+  'agentMemory.writeGlobal': { schema: agentMemoryWriteGlobalRequestSchema, invoke: (api, r) => api.agentMemory.writeGlobal(r) },
+  'agentMemory.readAgent': { schema: agentMemoryReadAgentRequestSchema, invoke: (api, r) => api.agentMemory.readAgent(r) },
+  'agentMemory.writeAgent': { schema: agentMemoryWriteAgentRequestSchema, invoke: (api, r) => api.agentMemory.writeAgent(r) },
+  'agentMemory.remember': { schema: agentMemoryRememberRequestSchema, invoke: (api, r) => api.agentMemory.remember(r) },
   'goal.create': { schema: goalCreateRequestSchema, invoke: (api, r) => api.goals.create(r) },
   'goal.edit': { schema: goalEditRequestSchema, invoke: (api, r) => api.goals.edit(r) },
   'goal.pause': { schema: goalPauseRequestSchema, invoke: (api, r) => api.goals.pause(r) },

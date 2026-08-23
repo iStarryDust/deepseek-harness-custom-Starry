@@ -23,6 +23,7 @@ function scriptedApi(overrides: {
   host?: Partial<ApiProxy['host']>
   skills?: Partial<ApiProxy['skills']>
   agentPresets?: Partial<ApiProxy['agentPresets']>
+  agentMemory?: Partial<ApiProxy['agentMemory']>
   events?: Partial<ApiProxy['events']>
   goals?: Partial<ApiProxy['goals']>
   settings?: Partial<ApiProxy['settings']>
@@ -103,6 +104,13 @@ function scriptedApi(overrides: {
       openDocument: r => ok(r, { opened: true as const }),
       remove: r => ok(r, {}),
       ...overrides.agentPresets,
+    },
+    agentMemory: {
+      readGlobal: r => ok(r, { text: '' }),
+      writeGlobal: r => ok(r, {}),
+      readAgent: r => ok(r, { agentId: r.payload.agentId, text: '' }),
+      writeAgent: r => ok(r, { agentId: r.payload.agentId }),
+      remember: r => ok(r, { saved: true, agentId: 'agent-stub', outcome: 'remembered 1 entry' }),
     },
     goals: {
       create: err,

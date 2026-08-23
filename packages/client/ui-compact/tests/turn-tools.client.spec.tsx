@@ -3,13 +3,15 @@
  * TurnTools rendering and gestures: both icon buttons expose their labels, the
  * compact trigger dispatches the injected verb once (and stays in flight while
  * it runs), success resets the row silently, an admitted failure shows the
- * host's detail inline for a few seconds, and the reserved memory entry only
- * acknowledges the seat.
+ * host's detail inline for a few seconds, and the memory entry opens the
+ * selectable-messages dialog (empty snapshot shows the empty state; cancel
+ * closes it; a checked row hands its text to the injected remember verb).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
+import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import { TurnTools } from '../src/client/TurnTools.tsx'
 import type { CompactOutcome } from '../src/client/TurnTools.tsx'
 import { zh } from '../src/client/locales.ts'
@@ -24,12 +26,33 @@ beforeEach(() => {
 
 const t = makeTranslate(zh, commonZh)
 
-/** Render the controls over a recording compact verb. */
-function mount(compact: () => Promise<CompactOutcome> = () => Promise.resolve({ ok: true })) {
-  const fn = vi.fn(compact)
-  const props = { compact: fn, t } as unknown as Parameters<typeof TurnTools>[0]
+const SID = 's1' as never
+
+/** Minimal empty conversation snapshot the dialog reads through useSession. */
+const EMPTY_SNAPSHOT = {
+  sessionId: SID,
+  chat: {
+    nodes: { values: () => [] as never[], get: () => undefined },
+  },
+} as unknown as ConversationSnapshot
+
+/** Render the controls over a recording compact verb and a stub session kit. */
+function mount(
+  compact: () => Promise<CompactOutcome> = () => Promise.resolve({ ok: true }),
+  snapshot: ConversationSnapshot = EMPTY_SNAPSHOT,
+) {
+  const compactFn = vi.fn(compact)
+  const rememberFn = vi.fn(() => Promise.resolve())
+  const useSession = ((selector: (s: ConversationSnapshot) => unknown) => selector(snapshot)) as never
+  const props = {
+    compact: compactFn,
+    remember: rememberFn,
+    useSession,
+    sessionId: SID,
+    t,
+  } as unknown as Parameters<typeof TurnTools>[0]
   const ui = render(<TurnTools {...props} />)
-  return { ui, compact: fn }
+  return { ui, compact: compactFn, remember: rememberFn }
 }
 
 describe('TurnTools', () => {
@@ -86,51 +109,93 @@ describe('TurnTools', () => {
     expect(ui.getByRole('alert').textContent).toBe(zh['state.compactFailed'])
   })
 
-  it('cancels a pending memory notice when a successful compact lands first', async () => {
+  it('opens the memory dialog on the memory button and shows the empty state', () => {
     const { ui } = mount()
 
     fireEvent.click(ui.getByLabelText(zh['action.memory']))
-    expect(ui.getByRole('status').textContent).toBe(zh['state.memorySoon'])
+    expect(ui.getByText(zh['memory.title'])).toBeTruthy()
+    expect(ui.getByText(zh['memory.empty'])).toBeTruthy()
+  })
 
-    fireEvent.click(ui.getByLabelText(zh['action.compact']))
+  it('closes the memory dialog via cancel without remembering anything', () => {
+    const { ui, remember } = mount()
+
+    fireEvent.click(ui.getByLabelText(zh['action.memory']))
+    fireEvent.click(ui.getByText(zh['memory.cancel']))
+
+    expect(ui.queryByText(zh['memory.title'])).toBeNull()
+    expect(remember).not.toHaveBeenCalled()
+  })
+
+  it('hands the checked message text to the remember verb and closes on success', async () => {
+    const snapshot = {
+      sessionId: SID,
+      chat: {
+        nodes: {
+          values: () => [{
+            kind: 'user',
+            id: 'u1',
+            key: 'u1',
+            target: 'chat',
+            anchorSeq: 1,
+            data: { content: [{ type: 'text', text: '我叫吐司' }] },
+          }] as never[],
+          get: () => undefined,
+        },
+      },
+    } as unknown as ConversationSnapshot
+    const { ui, remember } = mount(() => Promise.resolve({ ok: true }), snapshot)
+
+    fireEvent.click(ui.getByLabelText(zh['action.memory']))
+    fireEvent.click(ui.getByText(zh['memory.user']))
+    await act(async () => { fireEvent.click(ui.getByText(zh['memory.remember'])) })
     await act(async () => { await Promise.resolve() })
 
-    // The stale note timer must not resurrect the notice after the success reset.
-    act(() => { vi.advanceTimersByTime(3_000) })
-    expect(ui.queryByRole('status')).toBeNull()
-    expect(ui.queryByRole('alert')).toBeNull()
+    expect(remember).toHaveBeenCalledTimes(1)
+    expect(remember).toHaveBeenCalledWith(expect.stringContaining('我叫吐司'))
+    expect(ui.queryByText(zh['memory.title'])).toBeNull()
   })
 
-  it('shows the reserved memory notice briefly and returns to idle', () => {
-    const { ui } = mount()
-
-    fireEvent.click(ui.getByLabelText(zh['action.memory']))
-    expect(ui.getByRole('status').textContent).toBe(zh['state.memorySoon'])
-
-    act(() => { vi.advanceTimersByTime(2_500) })
-    expect(ui.queryByRole('status')).toBeNull()
-  })
-
-  it('clears a pending notice timer when the row unmounts', () => {
-    const clearSpy = vi.spyOn(window, 'clearTimeout')
-    const { ui } = mount()
-
-    fireEvent.click(ui.getByLabelText(zh['action.memory']))
+  it('keeps the dialog open and surfaces a remember failure inline', async () => {
+    const snapshot = {
+      sessionId: SID,
+      chat: {
+        nodes: {
+          values: () => [{
+            kind: 'assistant-step',
+            id: 'a1',
+            key: 'a1',
+            target: 'chat',
+            anchorSeq: 1,
+            data: { blocks: [{ kind: 'text', text: '好的，我会记住' }] },
+          }] as never[],
+          get: () => undefined,
+        },
+      },
+    } as unknown as ConversationSnapshot
+    const { ui } = mount(
+      () => Promise.resolve({ ok: true }),
+      snapshot,
+    )
+    const remember = vi.fn(() => Promise.reject(new Error('boom')))
+    const useSession = ((selector: (s: ConversationSnapshot) => unknown) => selector(snapshot)) as never
+    const props = {
+      compact: () => Promise.resolve({ ok: true }),
+      remember,
+      useSession,
+      sessionId: SID,
+      t,
+    } as unknown as Parameters<typeof TurnTools>[0]
     ui.unmount()
+    const rerendered = render(<TurnTools {...props} />)
 
-    expect(clearSpy).toHaveBeenCalled()
-    clearSpy.mockRestore()
-  })
+    fireEvent.click(rerendered.getByLabelText(zh['action.memory']))
+    fireEvent.click(rerendered.getByText(zh['memory.assistant']))
+    await act(async () => { fireEvent.click(rerendered.getByText(zh['memory.remember'])) })
+    await act(async () => { await Promise.resolve() })
 
-  it('re-acknowledges the reserved memory entry and resets its timer', () => {
-    const { ui } = mount()
-    const memory = ui.getByLabelText(zh['action.memory'])
-
-    fireEvent.click(memory)
-    fireEvent.click(memory)
-    expect(ui.getByRole('status').textContent).toBe(zh['state.memorySoon'])
-
-    act(() => { vi.advanceTimersByTime(2_500) })
-    expect(ui.queryByRole('status')).toBeNull()
+    expect(remember).toHaveBeenCalledTimes(1)
+    expect(rerendered.getByText(zh['memory.title'])).toBeTruthy()
+    expect(rerendered.getByText('boom')).toBeTruthy()
   })
 })

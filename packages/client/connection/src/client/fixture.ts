@@ -1560,6 +1560,9 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
     ['minimal', { trust: 'system', content: "- id: tool-web-search\n  name: '@deepseek-ai/dsh-tool-web-search'\n" }],
     ['my-agent', { trust: 'user', content: "- id: tool-read\n  name: '@deepseek-ai/dsh-tool-read'\n" }],
   ])
+
+  /** In-memory global memory document behind the agentMemory fixture rows. */
+  let fixtureGlobalMemoryText = ''
   let fixtureDefaultPreset = 'standard'
   const nextTurn = new Map<SessionId, number>([[sid('fx-alpha'), 75]])
   let nextSession = 1
@@ -2945,6 +2948,20 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       },
     },
 
+    agentMemory: {
+      // The fixture keeps one in-memory global document and answers every
+      // agent read with an empty document, so editor surfaces behave without
+      // a real harness-home store behind them.
+      readGlobal: request => ok(request, { text: fixtureGlobalMemoryText }),
+      writeGlobal: (request) => {
+        fixtureGlobalMemoryText = request.payload.text
+        return ok(request, {})
+      },
+      readAgent: request => ok(request, { agentId: request.payload.agentId, text: '' }),
+      writeAgent: request => ok(request, { agentId: request.payload.agentId }),
+      remember: request => ok(request, { saved: true, agentId: 'agent-stub', outcome: 'remembered 1 entry' }),
+    },
+
     skills: {
       list: (request) => {
         const missing = requireSession(request)
@@ -3289,6 +3306,11 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'agentPreset.update': return this.api.agentPresets.update(request)
       case 'agentPreset.openDocument': return this.api.agentPresets.openDocument(request, new AbortController().signal)
       case 'agentPreset.remove': return this.api.agentPresets.remove(request)
+      case 'agentMemory.readGlobal': return this.api.agentMemory.readGlobal(request)
+      case 'agentMemory.writeGlobal': return this.api.agentMemory.writeGlobal(request)
+      case 'agentMemory.readAgent': return this.api.agentMemory.readAgent(request)
+      case 'agentMemory.writeAgent': return this.api.agentMemory.writeAgent(request)
+      case 'agentMemory.remember': return this.api.agentMemory.remember(request)
       case 'goal.create': return this.api.goals.create(request)
       case 'goal.edit': return this.api.goals.edit(request)
       case 'goal.pause': return this.api.goals.pause(request)

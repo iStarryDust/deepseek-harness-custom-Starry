@@ -61,7 +61,7 @@ export interface AgentSessionEntry {
 }
 
 /** The browser's view. */
-export type AgentBrowserView = 'roster' | 'agent' | 'create' | 'edit'
+export type AgentBrowserView = 'roster' | 'agent' | 'create' | 'edit' | 'memory'
 
 /** Browser snapshot. */
 export interface AgentBrowserState {
@@ -81,11 +81,15 @@ export interface AgentBrowserState {
   busy: boolean
   /** Whether the roster list is collapsed (title-only). */
   collapsed: boolean
+  /** The agent-memory editor draft (view 'memory'). */
+  memoryText: string
+  /** Agent-memory editor transient state. */
+  memoryState: 'idle' | 'saving' | 'saved' | 'failed'
 }
 
 const INITIAL: AgentBrowserState = {
   status: 'idle', error: null, agents: [], bases: [], selected: '', view: 'roster',
-  profile: null, busy: false, collapsed: false,
+  profile: null, busy: false, collapsed: false, memoryText: '', memoryState: 'idle',
 }
 
 /** The meta preset offered only to preset authors; excluded from mode choices. */
@@ -116,7 +120,7 @@ function entryOf(preset: { id: string; name?: string; description?: string }): A
 /** The agent-preset wire face this controller needs. */
 export type AgentPresetWire = Pick<
   ConnectionHandle['api'],
-  'agentPresets'
+  'agentPresets' | 'agentMemory'
 >
 
 /**
@@ -336,6 +340,53 @@ export class AgentBrowserController {
     } catch (error) {
       this.set({ error: messageOf(error), view: 'agent' })
     }
+  }
+
+  /**
+   * Open one agent's memory editor, prefilled from the store.
+   * @param id - the agent whose memory to edit.
+   */
+  async openMemory(id: string): Promise<void> {
+    this.set({ view: 'memory', selected: id, memoryText: '', memoryState: 'idle', error: null })
+    try {
+      const response = await this.api.agentMemory.readAgent({ agentId: id })
+      if (!response.result.ok) {
+        this.set({ error: response.result.error.message, view: 'agent' })
+        return
+      }
+      this.set({ memoryText: response.result.value.text, memoryState: 'idle' })
+    } catch (error) {
+      this.set({ error: messageOf(error), view: 'agent' })
+    }
+  }
+
+  /** Update the memory editor draft. */
+  setMemoryText(text: string): void {
+    this.set({ memoryText: text, memoryState: 'idle' })
+  }
+
+  /**
+   * Save the memory editor draft to this agent's store.
+   * @returns the failure message, or undefined on success.
+   */
+  async saveMemory(): Promise<WireFailure> {
+    const { selected, memoryText } = this.store.getSnapshot()
+    if (selected === '') return 'no-selected-agent'
+    this.set({ busy: true, memoryState: 'saving', error: null })
+    try {
+      const response = await this.api.agentMemory.writeAgent({ agentId: selected, text: memoryText })
+      if (!response.result.ok) return response.result.error.message
+      this.set({ busy: false, memoryState: 'saved' })
+      return undefined
+    } catch (error) {
+      this.set({ busy: false, memoryState: 'failed', error: messageOf(error) })
+      return messageOf(error)
+    }
+  }
+
+  /** Return from the memory editor to the agent page. */
+  backFromMemory(): void {
+    this.set({ view: 'agent', memoryState: 'idle' })
   }
 
   /**

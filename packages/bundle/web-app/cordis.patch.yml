@@ -279,6 +279,11 @@
     - id: ui-compact
       name: '@deepseek-ai/dsh-client-ui-compact'
 
+    # Agent memory settings page: the four switches plus the global memory
+    # editor over the agent-memory domain.
+    - id: ui-settings-agent-memory
+      name: '@deepseek-ai/dsh-client-ui-settings-agent-memory'
+
     # Model selection: the /model popupSelect + composer seat over session.models.
     - id: ui-model-selection
       name: '@deepseek-ai/dsh-client-ui-model-selection'
@@ -455,3 +460,9 @@
       name: '@deepseek-ai/dsh-agent-presets'
       config:
         default: standard
+    # Long-term memory: the global/agent stores under the harness home, the
+    # four switches (default off), the prompt sections, and the memory_add
+    # tool the switches gate.
+    - id: agent-memory
+      name: '@deepseek-ai/dsh-agent-memory'
+      config: {}

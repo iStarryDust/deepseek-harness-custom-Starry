@@ -1,7 +1,8 @@
 /**
  * The turn-tail meta controls: a compact-messages trigger over the host
- * `/compact` command chain, and the reserved memory entry (placeholder only —
- * no behavior beyond the coming-soon notice until the memory feature lands).
+ * `/compact` command chain, and the memory-entry button that opens the
+ * selectable-messages dialog and sends what the human checks to the host
+ * remember path (AI condenses it into the agent's own memory).
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -10,6 +11,7 @@ import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-cli
 // Type-only: pulls the ui-conversation SlotMap merge (the turnTailMeta entry).
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { CompressIcon } from './CompressIcon.tsx'
+import { MemoryDialog } from './MemoryDialog.tsx'
 import { NS } from './locales.ts'
 import css from './TurnTools.module.css'
 
@@ -24,6 +26,8 @@ export interface CompactOutcome {
 /** Injected business face: the compact verb bound to this session's agent. */
 export interface TurnToolsInjected {
   compact: () => Promise<CompactOutcome>
+  /** Condense selected conversation text into the agent's memory. */
+  remember: (text: string) => Promise<void>
 }
 
 /** Full props of one turn-tail meta entry. */
@@ -41,11 +45,12 @@ type State =
 
 /**
  * Compact and memory icon actions for the settled turn-tail row.
- * @param props - injected compact verb plus the namespace translator.
+ * @param props - injected compact/remember verbs plus the runtime session kit.
  * @returns the two icon buttons (and any transient inline copy).
  */
-export function TurnTools({ compact, t }: TurnToolsProps) {
+export function TurnTools({ compact, remember, useSession, sessionId, t }: TurnToolsProps) {
   const [state, setState] = useState<State>({ kind: 'idle' })
+  const [memoryOpen, setMemoryOpen] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => () => {
@@ -72,38 +77,53 @@ export function TurnTools({ compact, t }: TurnToolsProps) {
     settle({ kind: 'failed', text: outcome.text ?? t('state.compactFailed') }, 4_000)
   }
 
-  /** Reserved memory entry: acknowledges the seat without implementing anything yet. */
+  /** Remember: open the dialog; nothing is written until the human checks + submits. */
   const onMemory = (): void => {
-    settle({ kind: 'noted', text: t('state.memorySoon') }, 2_500)
+    setMemoryOpen(true)
+  }
+
+  const onRemember = async (text: string): Promise<void> => {
+    await remember(text)
   }
 
   const busy = state.kind === 'running'
   return (
-    <span className={css.tools}>
-      <Tooltip label={t('action.compact')} side="bottom">
-        <button
-          type="button"
-          className={css.action}
-          aria-label={t('action.compact')}
-          aria-busy={busy || undefined}
-          aria-disabled={busy || undefined}
-          onClick={() => { void onCompact() }}
-        >
-          {busy ? <span className={css.spinner} aria-hidden /> : <CompressIcon size={16} />}
-        </button>
-      </Tooltip>
-      <Tooltip label={t('action.memory')} side="bottom">
-        <button
-          type="button"
-          className={css.action}
-          aria-label={t('action.memory')}
-          onClick={onMemory}
-        >
-          <IconAgentPresetOutline16 size={16} />
-        </button>
-      </Tooltip>
-      {state.kind === 'failed' && <span className={css.failed} role="alert">{state.text}</span>}
-      {state.kind === 'noted' && <span className={css.note} role="status">{state.text}</span>}
-    </span>
+    <>
+      <span className={css.tools}>
+        <Tooltip label={t('action.compact')} side="bottom">
+          <button
+            type="button"
+            className={css.action}
+            aria-label={t('action.compact')}
+            aria-busy={busy || undefined}
+            aria-disabled={busy || undefined}
+            onClick={() => { void onCompact() }}
+          >
+            {busy ? <span className={css.spinner} aria-hidden /> : <CompressIcon size={16} />}
+          </button>
+        </Tooltip>
+        <Tooltip label={t('action.memory')} side="bottom">
+          <button
+            type="button"
+            className={css.action}
+            aria-label={t('action.memory')}
+            onClick={onMemory}
+          >
+            <IconAgentPresetOutline16 size={16} />
+          </button>
+        </Tooltip>
+        {state.kind === 'failed' && <span className={css.failed} role="alert">{state.text}</span>}
+        {state.kind === 'noted' && <span className={css.note} role="status">{state.text}</span>}
+      </span>
+      {memoryOpen && (
+        <MemoryDialog
+          sessionId={sessionId}
+          useSession={useSession}
+          onRemember={onRemember}
+          onClose={() => { setMemoryOpen(false) }}
+          t={t}
+        />
+      )}
+    </>
   )
 }

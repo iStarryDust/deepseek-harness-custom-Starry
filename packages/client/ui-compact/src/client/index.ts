@@ -8,6 +8,7 @@
  */
 
 import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls the generated Remote API (remote.commands.execute) and the
 // ctx.remote merge through the Client assembly boundary.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
@@ -23,7 +24,7 @@ export type { CompactOutcome, TurnToolsInjected, TurnToolsProps } from './TurnTo
 export type { CompactKey } from './locales.ts'
 
 /** Required services: the slot registry, the command Remote namespace, the copy. */
-export const inject = ['slots', 'locale', 'remote', 'remote.commands']
+export const inject = ['slots', 'locale', 'connection', 'remote', 'remote.commands']
 
 /**
  * Client plugin body: register the dictionaries and the turn-tail meta entry.
@@ -50,6 +51,13 @@ export function apply(ctx: ClientContext): void {
           return { ok: false, text: result.value.result.text }
         }
         return { ok: true }
+      },
+      remember: async (text: string): Promise<void> => {
+        const api = (ctx.get('connection') as ConnectionHandle).api
+        const response = await api.agentMemory.remember({ sessionId, text })
+        if (!response.result.ok) {
+          throw new Error(`agentMemory.remember failed: ${response.result.error.message}`)
+        }
       },
     }),
   }, TurnTools))

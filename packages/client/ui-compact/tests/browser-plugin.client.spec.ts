@@ -40,7 +40,15 @@ async function bench(execute?: () => Promise<unknown>): Promise<{ ctx: Context; 
   } as never, () => null)
   // The locale plugin binds a settings scope, which reads the connection handle
   // and the forwarded-event port.
-  ctx.provide('connection', { api: { settings: {} }, isLoopback: false } as never)
+  ctx.provide('connection', {
+    api: {
+      settings: {},
+      agentMemory: {
+        remember: (() => Promise.resolve({ rpcId: 'r', result: { ok: true as const, value: { saved: true } } })) as never,
+      },
+    },
+    isLoopback: false,
+  } as never)
   const commandsRemote = { execute: execute ?? (() => Promise.resolve({ ok: true, value: { commandId: 'c', result: { kind: 'success' } } })) }
   ctx.provide('remote', { commands: commandsRemote, $on: () => () => {} } as never)
   ctx.provide('remote.commands', commandsRemote as never)
@@ -64,7 +72,7 @@ function entryInject(ctx: Context): (sessionId: SessionId) => { compact: () => P
 
 describe('ui-compact browser half', () => {
   it('declares the services it binds', () => {
-    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.commands'])
+    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.commands'])
   })
 
   it('registers the turn-tail meta entry, and fiber teardown removes it (HMR safety)', async () => {

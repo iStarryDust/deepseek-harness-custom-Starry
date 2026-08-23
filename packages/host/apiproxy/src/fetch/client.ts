@@ -49,6 +49,13 @@ import {
   agentPresetSelectValueSchema, agentPresetUpdateValueSchema,
 } from '../api/agent-presets.schema.ts'
 import {
+  agentMemoryReadAgentValueSchema,
+  agentMemoryReadGlobalValueSchema,
+  agentMemoryRememberValueSchema,
+  agentMemoryWriteAgentValueSchema,
+  agentMemoryWriteGlobalValueSchema,
+} from '../api/agent-memory.schema.ts'
+import {
   goalCreateValueSchema,
   goalEditValueSchema,
   goalPauseValueSchema,
@@ -140,6 +147,13 @@ export interface IApiClient {
     openDocument(payload: RequestPayload<'agentPreset.openDocument'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.openDocument'>>>
     remove(payload: RequestPayload<'agentPreset.remove'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.remove'>>>
   }
+  agentMemory: {
+    readGlobal(payload: RequestPayload<'agentMemory.readGlobal'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentMemory.readGlobal'>>>
+    writeGlobal(payload: RequestPayload<'agentMemory.writeGlobal'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentMemory.writeGlobal'>>>
+    readAgent(payload: RequestPayload<'agentMemory.readAgent'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentMemory.readAgent'>>>
+    writeAgent(payload: RequestPayload<'agentMemory.writeAgent'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentMemory.writeAgent'>>>
+    remember(payload: RequestPayload<'agentMemory.remember'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentMemory.remember'>>>
+  }
   events: {
     mux(payload: Parameters<ApiProxy['events']['mux']>[0]['payload'], signal: AbortSignal, onOpen?: () => void): AsyncIterable<RpcRequest<MuxFrame>>
     host(payload: Parameters<ApiProxy['events']['host']>[0]['payload'], signal: AbortSignal, onOpen?: () => void): AsyncIterable<RpcRequest<HostFrame>>
@@ -218,6 +232,11 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'agentPreset.update': agentPresetUpdateValueSchema,
   'agentPreset.openDocument': agentPresetOpenDocumentValueSchema,
   'agentPreset.remove': agentPresetRemoveValueSchema,
+  'agentMemory.readGlobal': agentMemoryReadGlobalValueSchema,
+  'agentMemory.writeGlobal': agentMemoryWriteGlobalValueSchema,
+  'agentMemory.readAgent': agentMemoryReadAgentValueSchema,
+  'agentMemory.writeAgent': agentMemoryWriteAgentValueSchema,
+  'agentMemory.remember': agentMemoryRememberValueSchema,
   'goal.create': goalCreateValueSchema,
   'goal.edit': goalEditValueSchema,
   'goal.pause': goalPauseValueSchema,
@@ -487,6 +506,14 @@ export abstract class AbstractApiClient implements IApiClient {
     update: (payload, signal) => this.callUnary('agentPreset.update', payload, signal),
     openDocument: (payload, signal) => this.callUnary('agentPreset.openDocument', payload, signal),
     remove: (payload, signal) => this.callUnary('agentPreset.remove', payload, signal),
+  }
+
+  readonly agentMemory: IApiClient['agentMemory'] = {
+    readGlobal: (payload, signal) => this.callUnary('agentMemory.readGlobal', payload, signal),
+    writeGlobal: (payload, signal) => this.callUnary('agentMemory.writeGlobal', payload, signal),
+    readAgent: (payload, signal) => this.callUnary('agentMemory.readAgent', payload, signal),
+    writeAgent: (payload, signal) => this.callUnary('agentMemory.writeAgent', payload, signal),
+    remember: (payload, signal) => this.callUnary('agentMemory.remember', payload, signal),
   }
 
   readonly goals: IApiClient['goals'] = {

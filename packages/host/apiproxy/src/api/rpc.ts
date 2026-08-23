@@ -50,6 +50,7 @@ export interface RpcErrorDetailsMap {
   'agent-preset-conflict': { sessionId: SessionId; requestedPreset: string; existingPreset?: string }
   'agent-preset-not-found': { agentPreset: string; available: string[] }
   'agent-preset-invalid': { agentPreset: string; reason: string }
+  'agent-memory-unavailable': {}
   'agent-busy': { reason: string }
   'attachment-error': { reason: string }
   'queue-item-not-found': { itemId: MessageId }

@@ -1,0 +1,127 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 20px 24px 28px;
+  max-width: 760px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px 32px;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cellLabel {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--dsw-alias-fg-1);
+}
+
+.track {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  padding: 4px 12px 4px 4px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-layer-3);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  color: var(--dsw-alias-fg-3);
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.track:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.trackOn {
+  composes: track;
+  border-color: var(--dsw-alias-accent-2);
+  background: var(--dsw-alias-accent-2);
+  color: var(--dsw-alias-bg-1);
+}
+
+.thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--dsw-alias-label-tertiary);
+  flex: none;
+  transition: background 140ms ease;
+}
+
+.trackOn .thumb {
+  background: var(--dsw-alias-bg-1);
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--dsw-alias-fg-3);
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 640px;
+}
+
+.editorTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--dsw-alias-fg-1);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 220px;
+  resize: vertical;
+  font-family: var(--dsw-font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 19px;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-1);
+  color: var(--dsw-alias-fg-1);
+  box-sizing: border-box;
+}
+
+.textarea:focus-visible {
+  outline: 2px solid var(--dsw-alias-accent-2);
+  outline-offset: 1px;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.saved {
+  font-size: 12px;
+  color: var(--dsw-alias-success, #3fb984);
+}
+
+.error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dsw-alias-danger, #e5484d);
+}

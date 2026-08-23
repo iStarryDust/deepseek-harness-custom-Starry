@@ -50,6 +50,14 @@ export interface AgentBrowserInjected {
   openSession: (sessionId: string) => void
   /** Open one agent's profile for editing. */
   openProfile: (id: string) => Promise<void>
+  /** Open one agent's memory editor. */
+  openMemory: (id: string) => Promise<void>
+  /** Update the memory editor draft. */
+  setMemoryText: (text: string) => void
+  /** Save the memory editor draft; resolves to a failure message. */
+  saveMemory: () => Promise<string | undefined>
+  /** Return from the memory editor to the agent page. */
+  backFromMemory: () => void
   /** Toggle the roster list's collapsed state. */
   toggleCollapsed: () => void
   /** Create an agent from the form; resolves to a failure message. */
@@ -84,7 +92,8 @@ function rowClass(active: boolean): string {
  */
 export function AgentBrowser({
   useAgents, useSessions, useArchived, load, selectAgent, back, startChat, openSession,
-  openProfile, toggleCollapsed, create, saveEdit, remove, renameSession, archiveSession,
+  openProfile, openMemory, setMemoryText, saveMemory, backFromMemory, toggleCollapsed, create,
+  saveEdit, remove, renameSession, archiveSession,
   removeSession, t,
 }: AgentBrowserProps) {
   const state = useAgents(snapshot => snapshot)
@@ -200,6 +209,46 @@ export function AgentBrowser({
     )
   }
 
+  // The agent-memory editor: a plain document edit over the agent's own store.
+  if (state.view === 'memory' && state.selected !== '') {
+    const saving = state.memoryState === 'saving'
+    return (
+      <div className={css.memoryView}>
+        <div className={css.memoryHeader}>
+          <button
+            type="button"
+            className={css.backLink}
+            onClick={backFromMemory}
+          >
+            {t('agents.back')}
+          </button>
+          <span className={css.memoryTitle}>{t('agents.memory')}</span>
+        </div>
+        {state.error !== null && <div className={css.error} role="alert">{state.error}</div>}
+        <p className={css.memoryHint}>{t('agents.memory.hint')}</p>
+        <textarea
+          className={css.memoryTextarea}
+          value={state.memoryText}
+          disabled={saving}
+          onChange={(event) => { setMemoryText(event.target.value) }}
+          spellCheck={false}
+        />
+        <div className={css.memoryFooter}>
+          <button
+            type="button"
+            className={css.action}
+            disabled={saving}
+            onClick={() => { void saveMemory() }}
+          >
+            {saving ? t('agents.memory.saving') : t('agents.memory.save')}
+          </button>
+          {state.memoryState === 'saved' && <span className={css.memorySaved}>{t('agents.memory.saved')}</span>}
+          {state.memoryState === 'failed' && <span className={css.error}>{t('agents.memory.saveFailed')}</span>}
+        </div>
+      </div>
+    )
+  }
+
   // The agent page: the selected agent's actions over its chat history.
   if (state.view === 'agent' && state.selected !== '') {
     const selected = state.selected
@@ -222,6 +271,15 @@ export function AgentBrowser({
               onClick={() => { void openProfile(selected) }}
             >
               {t('agents.profile')}
+            </button>
+          </div>
+          <div className={css.selectedActions}>
+            <button
+              type="button"
+              className={css.action}
+              onClick={() => { void openMemory(selected) }}
+            >
+              {t('agents.memory')}
             </button>
           </div>
           {/* A local key translates; a raw wire message (not a key) falls back to itself. */}
