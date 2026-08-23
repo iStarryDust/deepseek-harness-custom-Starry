@@ -79,6 +79,8 @@ pnpm dsh web
 | `session.remove` | 注入 bug | **已修复** |
 | 设置页 Agent 预设入口 | 默认行 + 管理分区 | 收归侧边栏 Agent 名单 |
 | `packages/web/browser` | — | **新增**：内置浏览器插件（Playwright Chromium 安装于 `~/.dsh/browser`；Agent 通过 `browser_open` / `browser_interact` 打开并操作网页） |
+| `packages/compaction` | 抽象 seam | **增强**：轮次尾部压缩按钮（`ui-compact`）、`CompactionEngine` seam（`ctx.compaction`）、工具结果剪枝、`/compact` 命令 |
+| `packages/preset/agent-memory` | — | **新增**：长期记忆——`<dshHome>/agent-memory` 下的 markdown 存储、四个开关（全局 / Agent / 自动 / 询问）、系统提示注入、`memory_add` 工具，以及一个用 Agent 自身模型把圈选消息浓缩成记忆的记忆按钮 |
 
 并继承上游 `0.1.1-rc.2` 的全部能力——含 **统一图像请求管线**（规范化附件、路由级请求版本、DeepSeek Files 生命周期）。
 
