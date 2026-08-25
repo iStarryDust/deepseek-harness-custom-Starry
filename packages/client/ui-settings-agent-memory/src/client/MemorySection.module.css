@@ -1,8 +1,8 @@
 .root {
   display: flex;
   flex-direction: column;
-  gap: 28px;
-  padding: 20px 24px 28px;
+  gap: 0;
+  padding: 0 24px 28px;
   max-width: 760px;
 }
 
@@ -10,6 +10,8 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px 32px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
 }
 
 .cell {

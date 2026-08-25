@@ -1,0 +1,8 @@
+# The dsh-schedule-toggle bundle patch: mounts the Schedule feature switch so
+# the web Settings -> General page can turn the Schedule reminder plugin on and
+# off by editing the profile cordis.patch.yml at runtime (watchUserPatches
+# hot-reloads the change; no restart needed).
+
+- insert:
+    - id: schedule-toggle
+      name: '@deepseek-ai/dsh-schedule-toggle'

@@ -60,6 +60,7 @@ This is a customized fork of [DeepSeek Harness](https://github.com/deepseek-ai/d
 | `packages/web/browser` | — | **New**: built-in browser plugin (Playwright Chromium under `~/.dsh/browser`; the agent opens and interacts with pages via `browser_open` / `browser_interact`) |
 | `packages/compaction` | abstract seam | **Enhanced**: a turn-tail compact trigger (`ui-compact`), the `CompactionEngine` seam (`ctx.compaction`), tool-result pruning, and a `/compact` command |
 | `packages/preset/agent-memory` | — | **New**: long-term agent memory — markdown stores under `<dshHome>/agent-memory`, four switches (global / agent / auto / ask), prompt injection, a `memory_add` tool, and a UI memory button that condenses selected messages with the agent's own model |
+| `packages/extensions/dsh-schedule-toggle` | — | **New**: a **定时计划 (Schedule reminders)** switch on the web Settings → General page; toggles the `time-context` + `schedule` plugins through the profile `cordis.patch.yml` (hot-reloaded, no restart). Ships agent skills `web-schedule`, `web-browser`, and `agent-memory` for the schedule / built-in-browser / memory workflows |
 
 It also inherits everything from upstream `0.1.1-rc.2` — including the **unified image request pipeline** (normalized attachments, route-owned request versions, DeepSeek Files lifecycle).
 
