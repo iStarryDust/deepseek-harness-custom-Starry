@@ -11,7 +11,7 @@ import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
-import type { Browser, BrowserContext, Page } from 'playwright'
+import type { Browser, BrowserContext, Page, Response } from 'playwright'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import type { BrowserSettings } from './settings.ts'
 
@@ -175,13 +175,36 @@ export function createBrowserRuntime(source: () => BrowserSettings): BrowserRunt
         return { url, title: '', status: 0, text: '内置浏览器未启用。请在 设置→插件→内置浏览器 中开启“启用内置浏览器”开关后重试。' }
       }
       const target = await ensureSession()
-      const response = await target.goto(url, { waitUntil: 'networkidle', timeout: 30_000 })
-      return {
-        url: target.url(),
-        title: await target.title(),
-        status: response?.status() ?? 0,
-        text: (await target.evaluate(() => document.body?.innerText ?? '')).slice(0, 20_000),
+      // Wait for the DOM instead of `networkidle`: heavy SPA pages (GitHub,
+      // dashboards, admin panels) keep long-lived connections or lazy-loaded
+      // traffic running, so `networkidle` rarely settles and the 30s timeout
+      // discarded an already-rendered page. When navigation still fails
+      // (offline, DNS, TLS reset), report the error in the page text instead
+      // of throwing away the snapshot.
+      let response: Response | null | undefined
+      let navError: unknown
+      try {
+        response = await target.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+      } catch (error) {
+        navError = error
       }
+      let title = ''
+      try {
+        title = await target.title()
+      } catch {
+        /* navigation failed before a document attached */
+      }
+      const status = response?.status() ?? 0
+      let text = ''
+      try {
+        text = (await target.evaluate(() => document.body?.innerText ?? '')).slice(0, 20_000)
+      } catch {
+        /* navigation failed before a document attached */
+      }
+      if (text === '' && navError !== undefined) {
+        text = `页面加载失败：${navError instanceof Error ? navError.message : String(navError)}`
+      }
+      return { url: target.url(), title, status, text }
     },
     async act(action: BrowserActAction, args: BrowserActArgs = {}): Promise<BrowserPageResult> {
       const current = source()
