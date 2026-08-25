@@ -1,0 +1,64 @@
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.text {
+  min-width: 0;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.desc {
+  font-size: 12px;
+  opacity: 0.65;
+  margin-top: 2px;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* Both states carry position:relative and the flex track so the knob never
+   escapes the control (no composes, no absolute positioning here). */
+.switch,
+.switchOn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  flex: none;
+  width: 48px;
+  height: 26px;
+  padding: 2px;
+  border-radius: 13px;
+  border: 1px solid rgba(127, 127, 127, 0.45);
+  background: rgba(127, 127, 127, 0.18);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.switchOn {
+  border-color: rgba(79, 140, 255, 0.9);
+  background: rgba(79, 140, 255, 0.9);
+}
+
+.knob {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s;
+}
+
+.switchOn .knob {
+  transform: translateX(22px);
+}

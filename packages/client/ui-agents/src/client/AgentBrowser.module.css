@@ -1,0 +1,360 @@
+/* Agent browsing region (fills the sidebar shell's hole): the selected-agent
+   action strip, the roster header, and the scrolling agent list. */
+
+.root {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding-right: var(--dsh-sidebar-inline-padding);
+}
+
+.centered {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  text-align: center;
+  padding: 16px;
+}
+
+.error {
+  color: var(--dsw-alias-danger);
+  font-size: 12px;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.retry {
+  border: none;
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* Selected-agent action strip. */
+.selectedArea {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 8px;
+  margin: 2px 2px 8px;
+  border: 1px solid var(--dsw-alias-border-default);
+  border-radius: 12px;
+  background: var(--dsw-alias-surface-raised);
+}
+
+.selectedName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectedActions {
+  display: flex;
+  gap: 6px;
+}
+
+.action {
+  flex: 1;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.action:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
+/* Roster header. */
+.sectionHeader {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 32px;
+  padding-left: 4px;
+  box-sizing: border-box;
+}
+
+.sectionLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.addButton {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.addButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.empty {
+  padding: 24px 12px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* Agent rows. */
+.list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  background: transparent;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.row:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.row.active {
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
+.rowName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.rowDescription {
+  font-size: 11px;
+  color: var(--dsw-alias-label-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* Chat-history row: the open button plus the trailing three-dot menu. */
+.chatRow {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px;
+  border-radius: 10px;
+}
+
+.chatRow:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.chatRow.active {
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
+.chatRowOpen {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  border: none;
+  background: transparent;
+  padding: 6px 6px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.chatRowMenu {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.chatRow:hover .chatRowMenu,
+.chatRow.active .chatRowMenu {
+  opacity: 1;
+}
+
+.chatRowMenu:hover {
+  background: var(--dsw-alias-interactive-bg-active);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* Rename / delete dialogs. */
+.renameInput {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--dsw-alias-border-default);
+  border-radius: 8px;
+  background: var(--dsw-alias-surface-default);
+  color: var(--dsw-alias-label-primary);
+  padding: 8px 10px;
+  font-size: 13px;
+  outline: none;
+}
+
+.renameInput:focus {
+  border-color: var(--dsw-alias-accent);
+}
+
+.dialogError {
+  margin-top: 8px;
+  color: var(--dsw-alias-danger);
+  font-size: 12px;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.deleteAction {
+  color: var(--dsw-alias-danger) !important;
+  border-color: var(--dsw-alias-danger) !important;
+}
+
+/* Collapsible roster title (replaces the add button). */
+.collapsibleTitle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.collapsibleTitle:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.chevron {
+  font-size: 10px;
+  line-height: 1;
+  transition: transform 120ms var(--ds-ease-in-out);
+}
+
+.chevronClosed {
+  transform: rotate(90deg);
+}
+
+/* The blank right side while browsing the roster / creating an agent. */
+.blankScreen {
+  width: 100%;
+  height: 100%;
+  background: var(--dsw-alias-surface-default);
+}
+
+.memoryView {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.memoryHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.backLink {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  color: var(--dsw-alias-accent-2);
+  cursor: pointer;
+}
+
+.memoryTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dsw-alias-fg-1);
+}
+
+.memoryHint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--dsw-alias-fg-3);
+}
+
+.memoryTextarea {
+  width: 100%;
+  min-height: 220px;
+  resize: vertical;
+  font-family: var(--dsw-font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 18px;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-1);
+  color: var(--dsw-alias-fg-1);
+}
+
+.memoryFooter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.memorySaved {
+  font-size: 12px;
+  color: var(--dsw-alias-success, #3fb984);
+}
