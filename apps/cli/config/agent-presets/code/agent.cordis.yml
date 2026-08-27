@@ -252,6 +252,18 @@
     fetch: false
     searchTimeoutMs: 60000
 
+# ── browser ─────────────────────────────────────────────────────────────────
+
+# The host layer already registers the `browser` settings namespace and the
+# `ctx.browser` runtime (`packages/bundle/base/cordis.patch.yml`); this preset
+# only adds the model-facing tools against the inherited runtime. Under Code
+# Mode those tools surface as SDK methods (`await tools.browser_open(...)`),
+# matching the `standard` preset's capability set.
+- id: browser
+  name: '@deepseek-ai/dsh-browser'
+  config:
+    toolOnly: true
+
 # ── presentation ────────────────────────────────────────────────────────────
 
 # Code Mode for this agent alone. The row waits for the host's `codeRuntime`

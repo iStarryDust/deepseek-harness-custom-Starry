@@ -114,7 +114,7 @@ export function apply(ctx: ClientContext): void {
     ctx.workspaces.list.getSnapshot().archivedSessionIds,
   )
   const stopArchived = ctx.workspaces.list.subscribe(() => {
-    archived.update(() => ctx.workspaces.list.getSnapshot().archivedSessionIds)
+    archived.set(ctx.workspaces.list.getSnapshot().archivedSessionIds)
   })
 
   // Announce view moves so the shell can reshape its primary control.

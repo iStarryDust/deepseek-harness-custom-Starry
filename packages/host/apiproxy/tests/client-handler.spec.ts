@@ -97,6 +97,9 @@ function scriptedApi(overrides: {
     agentPresets: {
       list: r => ok(r, { presets: [], authorable: false, hasDocument: false }),
       select: r => ok(r, { agentPreset: r.payload.agentPreset }),
+      capabilities: r => ok(r, { groups: [] }),
+      composeEnvironment: r => ok(r, { agentPreset: `${r.payload.agentId}-env-x` }),
+      suggestEnvironment: r => ok(r, { groups: [] }),
       read: r => ok(r, { agentPreset: r.payload.agentPreset, trust: 'user' as const, content: '' }),
       copy: r => ok(r, { agentPreset: r.payload.agentPreset }),
       create: r => ok(r, { agentPreset: r.payload.agentPreset }),

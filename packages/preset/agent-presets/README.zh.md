@@ -23,8 +23,21 @@
 - `ctx.agentPresets.read(id): Promise<string>` 某个 preset 的组装文本，与存储内容逐字一致。
 - `ctx.agentPresets.copy(from, id, name?): Promise<void>` 通过整目录复制一个既有 preset 来创建本地创作的 preset——唯一的创作写入。组装文本不经过这道接缝，因此副本与其来源同等可加载；复制出的元数据保留来源的描述、但绝不保留其名称与 roster 排序，`name`（或回退到 id）才是区分两行的依据。
 - `ctx.agentPresets.remove(id): Promise<void>` 删除一个本地创作的 preset；已加入的会话保留其常驻挂载。若用户默认值恰好指向刚删除的 preset 则一并清除：存一个尚不存在的默认值是刻意的，但本次删除的这个再也不会有人提供，留着会让所有未显式指定的新会话无法启动。
+- `ctx.agentPresets.environmentGroups(): readonly EnvironmentGroup[]` 「定义模式」下可切换的能力清单。每项携带稳定的能力 id、展示名、一句说明与是否为默认启用，以及该能力归属的组装行引用（顶层行 id，或 `group.child` 形式的组内子行），供组合构建裁剪。
+- `ctx.agentPresets.defaultEnvironmentGroups(): readonly string[]` 新环境默认勾选的能力 id。
+- `ctx.agentPresets.composeEnvironment(agentId, input, enabledGroups): Promise<string>` 为某个 agent 组合一个一次性环境合并预设（`<agentId>-env-<slug>`），写入其自身 `modes/` 目录。组装是 `standard` 能力集的严格子集——删除未启用能力的行，组块只保留已启用的子项——并折入该 agent 的身份。返回合并预设 id，调用方随后用 `recompose()` 绑定到空白会话。
+- `ctx.agentPresets.suggestCapabilityGroups(description): readonly string[]` 依关键词确定性推断一段描述所需的能力 id，作为模型分析不可用时的回退。
 
 `AgentPreset` 携带 `id`（目录名）、`trust`（`system` 或 `user`，取自它所在的根目录）、`path`（组装文件的绝对路径），以及——仅当该 preset 无法组装会话时——`broken`（一条人类可读的原因，名单界面原样展示）。
+
+### 定义模式：per-agent 按需环境
+
+「定义模式」让使用者为某次对话指定所需的工作环境，而不是启用 `standard` 的全部工具。一个环境是 `standard` 能力集的一个具名子集：从能力清单勾选所需项，宿主据此生成一个只含这些工具的合并预设，并绑定到当前空白会话。以下为保证性质：
+
+- **安全性**。环境组合是 `standard` 的严格子集——组合构建只删除未启用能力的行，绝不添加基座未携带的能力——因此创作环境不会授予任何新权限。
+- **一次性**。每次定义环境都会生成一个新的合并预设（模式 id 形如 `env-<slug>`），保存于该 agent 自身的 `modes/` 目录。它被识别为组合预设（`env-` 前缀），因此不出现在侧边栏 agent 列表，也不进入可复用模式库；会话头与聊天记录仍以其展示名呈现。
+- **能力粒度**。能力清单由 `standard` 的行划分而来，涵盖终端、文件读写、文件检索、提问用户、待办清单、后台任务、技能、目标、网页检索、浏览器、计划模式、上下文压缩、子代理、工作流、Ralph 循环等；其中若干组块可被拆成子能力（如子代理、工作流、Ralph 循环彼此独立勾选）。
+- **模型辅助建议**。在 Web 界面填写描述后，可经 `agentPreset.suggestEnvironment` 让宿主用会话自身的模型路由做一次一次性补全，推断所需能力 id；模型不可用时回退到 `suggestCapabilityGroups` 的关键词推断。建议与默认能力合并，最终仍由使用者勾选为准。
 
 ### 应在何处调用 `mount()`
 

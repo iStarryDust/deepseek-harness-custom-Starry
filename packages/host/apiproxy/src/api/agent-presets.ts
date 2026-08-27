@@ -42,6 +42,18 @@ export interface AgentPresetEntry {
   readonly broken?: string
 }
 
+/** One toggleable capability group a "定义模式 / Define mode" environment offers. */
+export interface EnvironmentGroupEntry {
+  /** Stable group id; the browser localizes the label, the id addresses. */
+  readonly id: string
+  /** English display name, the fallback when a locale has no key. */
+  readonly name: string
+  /** English one-line description, the fallback when a locale has no key. */
+  readonly description: string
+  /** Whether a fresh environment pre-selects this group in the picker. */
+  readonly defaultEnabled: boolean
+}
+
 /** agent-preset-domain unary methods (the map key agentPreset.* of RpcMethodMap). */
 export interface AgentPresetsApi {
   /**
@@ -70,6 +82,40 @@ export interface AgentPresetsApi {
    */
   select(request: RpcRequest<{ sessionId: SessionId; agentPreset: string }>):
   Promise<RpcResponse<{ agentPreset: string }>>
+
+  /**
+   * The toggleable capability palette a "定义模式 / Define mode" environment
+   * is built from. This is the browser's source for the toggles; composing an
+   * environment sends back the chosen group ids through `composeEnvironment`.
+   */
+  capabilities(request: RpcRequest<{}>):
+  Promise<RpcResponse<{ groups: readonly EnvironmentGroupEntry[] }>>
+
+  /**
+   * Compose a one-off per-agent environment combined preset (`<agentId>-env-…`).
+   *
+   * The composition is a strict subset of the `standard` capability set — the
+   * rows of every disabled group are dropped — so the caller still cannot name
+   * plugins: it only says which of `standard`'s capability groups to KEEP. The
+   * agent's own persona is folded in by the Host. Returns the combined preset
+   * id, which the caller then binds to a blank session through `select`.
+   */
+  composeEnvironment(request: RpcRequest<{
+    agentId: string
+    name: string
+    description?: string
+    groups: readonly string[]
+  }>): Promise<RpcResponse<{ agentPreset: string }>>
+
+  /**
+   * Analyze an environment description and recommend which capability groups
+   * it needs. The Host runs a model-backed one-shot analysis using the
+   * session's own model route; if that is unavailable it falls back to a
+   * deterministic keyword analysis. The result merges the deployment's default
+   * capability set, so a fresh environment keeps its usual baseline.
+   */
+  suggestEnvironment(request: RpcRequest<{ sessionId: SessionId; description: string }>, signal?: AbortSignal):
+  Promise<RpcResponse<{ groups: readonly string[] }>>
 
   /**
    * Read one preset's composition text, for the read-only viewer.

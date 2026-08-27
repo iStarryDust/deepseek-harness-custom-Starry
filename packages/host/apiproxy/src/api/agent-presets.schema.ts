@@ -7,7 +7,7 @@ import { z } from 'zod'
 import type { RequestPayload, ResponseValue } from './rpc-map.ts'
 import type { Wire } from './rpc.schema.ts'
 import { sessionIdSchema } from './sessions.schema.ts'
-import type { AgentPresetEntry } from './agent-presets.ts'
+import type { AgentPresetEntry, EnvironmentGroupEntry } from './agent-presets.ts'
 
 /** AgentPresetEntry row of agentPreset.list. */
 export const agentPresetEntrySchema = z.object({
@@ -40,6 +40,47 @@ export const agentPresetSelectRequestSchema = z.object({
 export const agentPresetSelectValueSchema = z.object({
   agentPreset: z.string(),
 }) satisfies z.ZodType<Wire<ResponseValue<'agentPreset.select'>>>
+
+/** One toggleable capability group an environment may enable. */
+export const environmentGroupEntrySchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string(),
+  defaultEnabled: z.boolean(),
+}) satisfies z.ZodType<Wire<EnvironmentGroupEntry>>
+
+/** agentPreset.capabilities request payload. */
+export const agentPresetCapabilitiesRequestSchema = z.object({
+}) satisfies z.ZodType<Wire<RequestPayload<'agentPreset.capabilities'>>>
+
+/** agentPreset.capabilities response value. */
+export const agentPresetCapabilitiesValueSchema = z.object({
+  groups: z.array(environmentGroupEntrySchema),
+}) satisfies z.ZodType<Wire<ResponseValue<'agentPreset.capabilities'>>>
+
+/** agentPreset.composeEnvironment request payload. */
+export const agentPresetComposeEnvironmentRequestSchema = z.object({
+  agentId: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  groups: z.array(z.string().min(1)),
+}) satisfies z.ZodType<Wire<RequestPayload<'agentPreset.composeEnvironment'>>>
+
+/** agentPreset.composeEnvironment response value. */
+export const agentPresetComposeEnvironmentValueSchema = z.object({
+  agentPreset: z.string(),
+}) satisfies z.ZodType<Wire<ResponseValue<'agentPreset.composeEnvironment'>>>
+
+/** agentPreset.suggestEnvironment request payload. */
+export const agentPresetSuggestEnvironmentRequestSchema = z.object({
+  sessionId: sessionIdSchema,
+  description: z.string().min(1),
+}) satisfies z.ZodType<Wire<RequestPayload<'agentPreset.suggestEnvironment'>>>
+
+/** agentPreset.suggestEnvironment response value. */
+export const agentPresetSuggestEnvironmentValueSchema = z.object({
+  groups: z.array(z.string().min(1)),
+}) satisfies z.ZodType<Wire<ResponseValue<'agentPreset.suggestEnvironment'>>>
 
 /** agentPreset.read request payload. */
 export const agentPresetReadRequestSchema = z.object({

@@ -23,8 +23,21 @@ Discovery is unmemoized: `list()` and `resolve()` re-read the roots on every cal
 - `ctx.agentPresets.read(id): Promise<string>` One preset's composition text, exactly as stored.
 - `ctx.agentPresets.copy(from, id, name?): Promise<void>` Create a locally authored preset by copying an existing one's whole directory — the only authoring write. No composition text crosses this seam, so a copy is exactly as loadable as its source; the copied metadata keeps the source's description but never its name or roster order, and `name` (or the id fallback) is what distinguishes the rows.
 - `ctx.agentPresets.remove(id): Promise<void>` Delete a locally authored preset; joined sessions keep their standing mount. Clears the user default when it named the preset just deleted: storing a default that does not exist yet is deliberate, but one this call removed will never be supplied again and would fail every session created without an explicit pick.
+- `ctx.agentPresets.environmentGroups(): readonly EnvironmentGroup[]` The toggleable capability palette for the "Define mode". Each entry carries a stable capability id, a display name, a one-line description, whether it is enabled by default, and the composition row references it owns (a top-level row id, or a `group.child` nested-row reference the builder prunes).
+- `ctx.agentPresets.defaultEnvironmentGroups(): readonly string[]` The capability ids a fresh environment pre-selects.
+- `ctx.agentPresets.composeEnvironment(agentId, input, enabledGroups): Promise<string>` Compose a one-off per-agent environment combined preset (`<agentId>-env-<slug>`) under the agent's own `modes/` directory. The composition is a strict subset of the `standard` capability set — the rows of every disabled capability are dropped, and a split group keeps only its enabled children — with the agent's identity folded in. Returns the combined preset id, which the caller then binds to a blank session through `recompose()`.
+- `ctx.agentPresets.suggestCapabilityGroups(description): readonly string[]` Deterministically infer the capability ids a description needs by keyword, as the fallback when the model-backed analysis is unavailable.
 
 `AgentPreset` carries `id` (the directory name), `trust` (`system` or `user`, from the root it was found under), `path` (the absolute composition file), and — only when the preset cannot compose a session — `broken` (one human-readable reason, shown verbatim on roster surfaces).
+
+### Define mode: per-agent on-demand environment
+
+"Define mode" lets a user specify the working environment a conversation needs instead of enabling every `standard` tool. An environment is a named subset of the `standard` capability set: the human ticks the capabilities it needs, the Host generates a combined preset containing only those tools, and binds it to the current blank session. The guarantees are:
+
+- **Safety.** The environment composition is a strict subset of `standard` — the builder only removes rows for unselected capabilities and never adds a capability the base did not carry — so composing an environment grants no new privilege.
+- **One-off.** Each definition mints a fresh combined preset (mode id `env-<slug>`) under the owning agent's `modes/` directory. It is recognized as a combined preset (the `env-` prefix), so it never reads as a regular roster agent and is not offered as a reusable mode; the session header and chat history still present it by its display name.
+- **Granularity.** The palette is derived from `standard`'s rows: shell, file editing, file search, ask-the-user, to-do list, background jobs, skills, goals, web search, browser, plan mode, context compaction, sub-agents, workflows, and Ralph loop. Several group blocks split into independently toggleable sub-capabilities (sub-agents, workflows, and Ralph loop are independent).
+- **Model-assisted suggestion.** After writing a description in the Web UI, the caller may issue `agentPreset.suggestEnvironment` so the Host runs a one-shot completion over the session's own model route to infer the needed capability ids; when the model is unavailable it falls back to `suggestCapabilityGroups`. The suggestion merges with the deployment defaults, and the human's ticks remain authoritative.
 
 ### Where to call `mount()`
 

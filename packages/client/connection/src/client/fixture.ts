@@ -2831,6 +2831,9 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         fixtureDefaultPreset = request.payload.agentPreset
         return ok(request, { agentPreset: request.payload.agentPreset })
       },
+      capabilities: request => ok(request, { groups: [] }),
+      composeEnvironment: request => ok(request, { agentPreset: `${request.payload.agentId}-env-fixture` }),
+      suggestEnvironment: request => ok(request, { groups: [] }),
       read: (request) => {
         const { agentPreset } = request.payload
         const preset = fixturePresets.get(agentPreset)
@@ -3300,6 +3303,9 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'skill.list': return this.api.skills.list(request)
       case 'agentPreset.list': return this.api.agentPresets.list(request)
       case 'agentPreset.select': return this.api.agentPresets.select(request)
+      case 'agentPreset.capabilities': return this.api.agentPresets.capabilities(request)
+      case 'agentPreset.composeEnvironment': return this.api.agentPresets.composeEnvironment(request)
+      case 'agentPreset.suggestEnvironment': return this.api.agentPresets.suggestEnvironment(request, signal)
       case 'agentPreset.read': return this.api.agentPresets.read(request)
       case 'agentPreset.copy': return this.api.agentPresets.copy(request)
       case 'agentPreset.create': return this.api.agentPresets.create(request)

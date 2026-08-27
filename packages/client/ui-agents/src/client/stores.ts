@@ -95,9 +95,22 @@ const INITIAL: AgentBrowserState = {
 /** The meta preset offered only to preset authors; excluded from mode choices. */
 const META_PRESET_ID = 'cordis'
 
+/**
+ * A combined preset id ends with the mode id: `<agentId>-<modeId>`. The mode
+ * id is the shipped `standard` / `code` / `minimal` or a per-agent `env-…`
+ * environment composition, so the environment combos never read as regular
+ * roster agents.
+ */
+const COMBINED_PRESET_RE = /-(standard|code|minimal|env-[a-z0-9-]+)$/
+
 /** A combined preset id ends with the mode id: `<agentId>-<modeId>`. */
 function isCombinedPreset(id: string): boolean {
-  return /-(standard|code|minimal)$/.test(id)
+  return COMBINED_PRESET_RE.test(id)
+}
+
+/** The mode id a combined preset id carries, when it is one. */
+function modeIdOf(combinedId: string): string | undefined {
+  return COMBINED_PRESET_RE.exec(combinedId)?.[1]
 }
 
 /** A failure message from a wire call, or undefined on success. */
@@ -220,8 +233,9 @@ export class AgentBrowserController {
 
   /** Map a combined preset id back to its mode id, when it is one. */
   modeIdFor(combinedId: string): string | undefined {
-    const mode = combinedId.split('-').pop()
-    return mode !== undefined && isCombinedPreset(combinedId) ? mode : undefined
+    // `split('-').pop()` breaks for the multi-segment `env-<slug>` mode id
+    // (it would return `<slug>`), so the mode id is captured as one token.
+    return modeIdOf(combinedId)
   }
 
   /**

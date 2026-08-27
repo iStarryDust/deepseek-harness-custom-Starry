@@ -29,16 +29,32 @@ export const MODES_DIR = 'modes'
 /**
  * The shipped mode ids a combined preset may be built from. Combined ids are
  * `<agentId>-<modeId>`, matching the Web browser's combined-preset filter
- * (`-(standard|code|minimal)$`); a same-named directory is shadowed by the
- * nested layout, so the set is fixed here rather than derived from the roster.
+ * (`-(standard|code|minimal|env-[a-z0-9-]+)$`); a same-named directory is
+ * shadowed by the nested layout, so the set is fixed here rather than derived
+ * from the roster. `env-` mode ids are the "定义模式/Define mode" per-agent
+ * environment compositions, authored at chat start as a strict subset of the
+ * `standard` capability set.
  */
 export const COMBINED_MODES = ['standard', 'code', 'minimal'] as const
+
+/** The mode-id prefix reserved for per-agent environment compositions. */
+export const ENVIRONMENT_MODE_PREFIX = 'env-'
+
+/**
+ * The mode-id suffix a combined-preset id may carry: the shipped modes plus the
+ * reserved environment namespace. Kept in one place so the host splitter, the
+ * browser filter, and the memory deducer never drift apart.
+ */
+export const COMBINED_MODE_SUFFIX = '(?:standard|code|minimal|env-[a-z0-9-]+)'
 
 /** One combined preset's identity, split from its flattened id. */
 export interface CombinedParts {
   /** The owning agent's preset id (its directory name). */
   readonly agentId: string
-  /** The mode id the combined preset composes (`standard` / `code` / `minimal`). */
+  /**
+   * The mode id the combined preset composes (`standard` / `code` / `minimal`,
+   * or an `env-…` environment id).
+   */
   readonly modeId: string
 }
 
@@ -49,7 +65,7 @@ export interface CombinedParts {
  * @returns the agent and mode parts, or undefined for a bare preset id.
  */
 export function combinedPartsOf(id: string): CombinedParts | undefined {
-  const match = /^(.+)-((?:standard|code|minimal))$/.exec(id)
+  const match = new RegExp(`^(.+)-(${COMBINED_MODE_SUFFIX})$`).exec(id)
   if (match === null) return undefined
   const agentId = match[1]
   const modeId = match[2]

@@ -17,6 +17,7 @@ import { dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { expandHomePath } from '@deepseek-ai/dsh-home-paths'
 import { COMPOSITION_FILE } from './discovery.ts'
+import { buildEnvironmentComposition } from './environment.ts'
 import { METADATA_FILE, renderPresetMetadata } from './metadata.ts'
 import { MODES_DIR, PRESET_ID, combinedPartsOf, type AgentPreset, type PresetRoot } from './preset.ts'
 
@@ -28,12 +29,14 @@ const ROW_START = /^- id: /m
 
 /**
  * Match one composition row by its id: from its `- id:` line through the line
- * before the next row start (or the end of the document).
+ * before the next row start, or the end of the document. The end anchor is
+ * `(?![\s\S])` ("nothing after here") rather than `\z`, because `\z` is not a
+ * JavaScript end-of-string anchor — it is a literal `z`.
  * @param id - the row id to locate.
  * @returns a matcher over the whole composition text.
  */
 function rowBlock(id: string): RegExp {
-  return new RegExp(`^- id: ${escapeRegExp(id)}\\n[\\s\\S]*?(?=${ROW_START.source}|\\z)`, 'm')
+  return new RegExp(`^- id: ${escapeRegExp(id)}\\n[\\s\\S]*?(?=${ROW_START.source}|(?![\\s\\S]))`, 'm')
 }
 
 /** Escape a literal string for use inside a RegExp. */
@@ -383,6 +386,55 @@ export async function createComposition(
     throw error
   }
   return dir
+}
+
+/**
+ * Create a per-agent environment combined preset (`<agentId>/modes/env-<slug>/`).
+ *
+ * The composition is a strict subset of the `standard` preset: the rows of
+ * every disabled capability group are removed, the always-on identity rows
+ * kept, and the agent's own persona folded in. Exactly like
+ * {@link createComposition}, the caller supplies no composition text — only the
+ * set of capability groups to KEEP — so authoring grants no capability the
+ * `standard` base did not already carry.
+ * @param roots - the configured roots; the first `user` one receives the env.
+ * @param agentId - the owning agent's preset id (must already exist).
+ * @param modeId - the environment mode id (`env-<slug>`).
+ * @param sourceComposition - the `standard` composition text to subset from.
+ * @param enabledGroups - the capability groups the environment keeps active.
+ * @param input - the creation form fields (name/language/persona/description).
+ * @returns the combined preset id (`<agentId>-<modeId>`).
+ * @throws when the mode id is unusable, the owning agent is absent, the
+ * directory is already occupied, or the deployment configures no writable root.
+ */
+export async function createEnvironmentComposition(
+  roots: readonly PresetRoot[],
+  agentId: string,
+  modeId: string,
+  sourceComposition: string,
+  enabledGroups: readonly string[],
+  input: CreateAgentInput,
+): Promise<string> {
+  if (!PRESET_ID.test(modeId)) throw new InvalidPresetIdError(modeId)
+  const combinedId = `${agentId}-${modeId}`
+  // An environment is always combined under its own agent; a flat fallback
+  // would read as a standalone roster agent, so a missing agent refuses
+  // rather than silently authoring one.
+  const nested = await combinedDirectory(roots, combinedId)
+  if (nested === undefined) throw new InvalidPresetIdError(combinedId)
+  // cp creates the target itself but not its parents; the agent folder and its
+  // `modes/` container must exist before the mode directory is written into.
+  await mkdir(dirname(nested), { recursive: true })
+  if (await occupied(nested)) throw new PresetExistsError(combinedId)
+  try {
+    const composition = buildEnvironmentComposition(sourceComposition, enabledGroups)
+    await writeFileAtomic(join(nested, COMPOSITION_FILE), composition, { mode: 0o600, dirMode: 0o700 })
+    await writePresetIdentity(nested, input)
+    return combinedId
+  } catch (error) {
+    await rm(nested, { recursive: true, force: true })
+    throw error
+  }
 }
 
 /**

@@ -31,9 +31,14 @@ import { settingsNamespace, type SettingsScope, type default as SettingsService 
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import { discoverPresets, USER_PRESET_DIR } from './discovery.ts'
 import {
-  copyComposition, createComposition, deleteComposition, readComposition, updateComposition,
+  copyComposition, createEnvironmentComposition, createComposition, deleteComposition,
+  readComposition, updateComposition,
   type CreateAgentInput,
 } from './authoring.ts'
+import {
+  ENVIRONMENT_GROUPS, defaultEnvironmentGroups, newEnvironmentModeId,
+  suggestCapabilityGroups, type EnvironmentGroup,
+} from './environment.ts'
 import { mountPreset, serviceForAgent, standingMountFor } from './mount.ts'
 import { PresetExistsError } from './authoring.ts'
 import { PresetMountError, UnknownPresetError, type AgentPreset, type Config, type PresetRoot } from './preset.ts'
@@ -62,12 +67,18 @@ export {
   type JoinedPresetMount, type PresetMount,
 } from './mount.ts'
 export {
-  copyComposition, createComposition, deleteComposition, InvalidPresetIdError,
-  PresetExistsError, PresetNotWritableError, readComposition, updateComposition, writableRoot,
-  type CreateAgentInput,
+  copyComposition, createEnvironmentComposition, createComposition, deleteComposition,
+  InvalidPresetIdError, PresetExistsError, PresetNotWritableError, readComposition,
+  updateComposition, writableRoot, type CreateAgentInput,
 } from './authoring.ts'
+export {
+  ENVIRONMENT_GROUPS, buildEnvironmentComposition,
+  defaultEnvironmentGroups, environmentGroupIds, newEnvironmentModeId,
+  suggestCapabilityGroups, type EnvironmentGroup,
+} from './environment.ts'
 export { resolveSessionPreset, type PresetBearingSession } from './session.ts'
 export { PresetMountError, UnknownPresetError } from './preset.ts'
+export { COMBINED_MODE_SUFFIX, ENVIRONMENT_MODE_PREFIX } from './preset.ts'
 export type { AgentPreset, Config, PresetRoot, PresetTrust } from './preset.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -418,6 +429,65 @@ export class AgentPresets extends Service {
     }
     await createComposition(this.resolvedRoots, source, id, input)
     this.standing.delete(id)
+  }
+
+  /**
+   * The toggleable capability palette a "定义模式 / Define mode" environment
+   * is built from, as the browser renders it (row ids stay internal).
+   * @returns one entry per group, in picker display order.
+   */
+  environmentGroups(): readonly EnvironmentGroup[] {
+    return ENVIRONMENT_GROUPS
+  }
+
+  /** The capabilities a fresh environment pre-selects, by id. */
+  defaultEnvironmentGroups(): readonly string[] {
+    return defaultEnvironmentGroups()
+  }
+
+  /**
+   * Deterministically suggest capability ids for a description by keyword —
+   * the fallback the Host uses when the model-backed analysis is unavailable.
+   * @param description - the environment description (name or note).
+   * @returns the keyword-implied capability ids.
+   */
+  suggestCapabilityGroups(description: string): readonly string[] {
+    return suggestCapabilityGroups(description)
+  }
+
+  /**
+   * Compose a one-off per-agent environment combined preset.
+   *
+   * The composition is a strict subset of the `standard` preset's capability
+   * set — the rows of every disabled group are dropped — so composing an
+   * environment grants no capability `standard` did not already carry. The
+   * result is a deterministic `<agentId>-env-<slug>` combined preset nested
+   * under the agent's own `modes/` directory, ready to be bound to a blank
+   * session through {@link recompose}.
+   * @param agentId - the owning agent's preset id.
+   * @param input - the agent's identity (name/language/persona) plus the
+   * environment's own display name in `input.name`.
+   * @param enabledGroups - the capability groups the environment keeps.
+   * @returns the combined preset id (`<agentId>-env-<slug>`).
+   * @throws when `standard` is unknown or unloadable, the owning agent is
+   * absent, or the deployment configures no writable root.
+   */
+  async composeEnvironment(
+    agentId: string,
+    input: CreateAgentInput,
+    enabledGroups: readonly string[],
+  ): Promise<string> {
+    const standard = await this.resolveMountable('standard')
+    const composition = await readComposition(standard)
+    const modeId = newEnvironmentModeId()
+    const combinedId = `${agentId}-${modeId}`
+    await createEnvironmentComposition(
+      this.resolvedRoots, agentId, modeId, composition, enabledGroups, input,
+    )
+    // A fresh composition has no settled mount; drop any stale pointer a
+    // deleted-then-recreated id could have left behind.
+    this.standing.delete(combinedId)
+    return combinedId
   }
 
   /**

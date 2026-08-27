@@ -47,9 +47,11 @@ import {
 } from '../api/workspace.schema.ts'
 import { skillListRequestSchema } from '../api/skills.schema.ts'
 import {
+  agentPresetCapabilitiesRequestSchema, agentPresetComposeEnvironmentRequestSchema,
   agentPresetCopyRequestSchema, agentPresetCreateRequestSchema, agentPresetListRequestSchema,
   agentPresetOpenDocumentRequestSchema, agentPresetReadRequestSchema, agentPresetRemoveRequestSchema,
-  agentPresetSelectRequestSchema, agentPresetUpdateRequestSchema,
+  agentPresetSelectRequestSchema, agentPresetSuggestEnvironmentRequestSchema,
+  agentPresetUpdateRequestSchema,
 } from '../api/agent-presets.schema.ts'
 import {
   agentMemoryReadAgentRequestSchema,
@@ -132,6 +134,9 @@ const UNARY_ROUTES: UnaryRoutes = {
   'skill.list': { schema: skillListRequestSchema, invoke: (api, r) => api.skills.list(r) },
   'agentPreset.list': { schema: agentPresetListRequestSchema, invoke: (api, r) => api.agentPresets.list(r) },
   'agentPreset.select': { schema: agentPresetSelectRequestSchema, invoke: (api, r) => api.agentPresets.select(r) },
+  'agentPreset.capabilities': { schema: agentPresetCapabilitiesRequestSchema, invoke: (api, r) => api.agentPresets.capabilities(r) },
+  'agentPreset.composeEnvironment': { schema: agentPresetComposeEnvironmentRequestSchema, invoke: (api, r) => api.agentPresets.composeEnvironment(r) },
+  'agentPreset.suggestEnvironment': { schema: agentPresetSuggestEnvironmentRequestSchema, invoke: (api, r, signal) => api.agentPresets.suggestEnvironment(r, signal) },
   'agentPreset.read': { schema: agentPresetReadRequestSchema, invoke: (api, r) => api.agentPresets.read(r) },
   'agentPreset.copy': { schema: agentPresetCopyRequestSchema, invoke: (api, r) => api.agentPresets.copy(r) },
   'agentPreset.create': { schema: agentPresetCreateRequestSchema, invoke: (api, r) => api.agentPresets.create(r) },

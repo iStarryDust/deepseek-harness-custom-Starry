@@ -105,6 +105,10 @@ export function apply(ctx: ClientContext): void {
       hooks: { agentPresetSeat: seat.store },
       load: () => seat.load(),
       select: (id: string) => seat.select(id),
+      loadCapabilities: () => seat.loadCapabilities(),
+      defineEnvironment: (name: string, description: string, groups: readonly string[]) =>
+        seat.defineEnvironment(name, description, groups),
+      suggestEnvironment: (description: string) => seat.suggestEnvironment(description),
       introduced: () => { seat.introduced() },
     })
 

@@ -240,6 +240,12 @@ export class FakeApiClient implements IApiClient {
     list: (payload: unknown) => this.record('agentPreset.list', payload, Promise.resolve(ok({ presets: [], authorable: false, hasDocument: false }))),
     select: (payload: { agentPreset: string }) =>
       this.record('agentPreset.select', payload, Promise.resolve(ok({ agentPreset: payload.agentPreset }))),
+    capabilities: (payload: unknown) =>
+      this.record('agentPreset.capabilities', payload, Promise.resolve(ok({ groups: [] }))),
+    composeEnvironment: (payload: { agentId: string }) =>
+      this.record('agentPreset.composeEnvironment', payload, Promise.resolve(ok({ agentPreset: `${payload.agentId}-env-fake` }))),
+    suggestEnvironment: (payload: unknown) =>
+      this.record('agentPreset.suggestEnvironment', payload, Promise.resolve(ok({ groups: [] }))),
     read: (payload: { agentPreset: string }) =>
       this.record('agentPreset.read', payload, Promise.resolve(ok({
         agentPreset: payload.agentPreset, trust: 'user' as const, content: '',

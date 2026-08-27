@@ -18,7 +18,9 @@ import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-cli
 import { IconAgentPresetOutline16, IconChevronDownOutline14, Menu } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: pulls the ui-conversation SlotMap merge (the hero seat).
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type { AgentPresetSeatState } from './seat-store.ts'
+import type { AgentPresetSeatState, EnvironmentCapability } from './seat-store.ts'
+import { DEFINE_MODE_ID } from './seat-store.ts'
+import { DefineEnvironmentDialog } from './DefineEnvironmentDialog.tsx'
 import { presetDisplayText } from './locales.ts'
 import css from './AgentPresetSeat.module.css'
 
@@ -32,6 +34,12 @@ export interface AgentPresetSeatInjected {
   load: () => Promise<void>
   /** Stage one preset for the next session. */
   select: (id: string) => Promise<void>
+  /** Read the environment capability palette. */
+  loadCapabilities: () => Promise<EnvironmentCapability[]>
+  /** Compose a per-agent environment and bind it to the blank session. */
+  defineEnvironment: (name: string, description: string, groups: readonly string[]) => Promise<string | undefined>
+  /** Model-backed capability suggestion for a written description. */
+  suggestEnvironment: (description: string) => Promise<string[]>
   /** Clear the one-shot introduce cue once the chip has played it. */
   introduced: () => void
 }
@@ -68,9 +76,12 @@ export type AgentPresetSeatProps =
  * @param props - composed slot props.
  * @returns the chip, or null when the deployment composes no presets.
  */
-export function AgentPresetSeat({ load, select, introduced, useAgentPresetSeat, t }: AgentPresetSeatProps) {
+export function AgentPresetSeat({
+  load, select, introduced, loadCapabilities, defineEnvironment, suggestEnvironment, useAgentPresetSeat, t,
+}: AgentPresetSeatProps) {
   const state = useAgentPresetSeat(snapshot => snapshot)
   const [open, setOpen] = useState(false)
+  const [defineOpen, setDefineOpen] = useState(false)
 
   useEffect(() => {
     void load()
@@ -126,45 +137,70 @@ export function AgentPresetSeat({ load, select, introduced, useAgentPresetSeat, 
     : label
 
   return (
-    <Menu
-      open={open}
-      onClose={() => { setOpen(false) }}
-      items={state.options.map((option) => {
-        const text = presetDisplayText(option, t)
-        return {
-          id: option.id,
-          // Name and description together: the id alone never says what a
-          // preset does, which is why the roster carries display copy.
-          label: (
-            <span className={css.item}>
-              <span className={css.itemName}>{text.name}</span>
-              <span className={css.itemDesc}>{text.description ?? t('noDescription')}</span>
-            </span>
-          ),
-        }
-      })}
-      selectedId={state.current}
-      onSelect={(id) => {
-        setOpen(false)
-        void select(id)
-      }}
-      align="start"
-      portal
-      anchor={(
-        <button
-          type="button"
-          className={css.seat}
-          aria-haspopup="menu"
-          aria-expanded={open}
-          title={state.error ?? t('seatHint')}
-          disabled={state.busy}
-          onClick={() => { setOpen(value => !value) }}
-        >
-          <IconAgentPresetOutline16 className={introducing ? `${css.seatIcon} ${css.introIcon}` : css.seatIcon} />
-          {shownLabel}
-          <IconChevronDownOutline14 className={css.chevron} />
-        </button>
-      )}
-    />
+    <>
+      <Menu
+        open={open}
+        onClose={() => { setOpen(false) }}
+        items={[
+          ...state.options.map((option) => {
+            const text = presetDisplayText(option, t)
+            return {
+              id: option.id,
+              // Name and description together: the id alone never says what a
+              // preset does, which is why the roster carries display copy.
+              label: (
+                <span className={css.item}>
+                  <span className={css.itemName}>{text.name}</span>
+                  <span className={css.itemDesc}>{text.description ?? t('noDescription')}</span>
+                </span>
+              ),
+            }
+          }),
+          ...(state.canDefine ? [{
+            id: DEFINE_MODE_ID,
+            label: (
+              <span className={css.item}>
+                <span className={css.itemName}>{t('defineModeName')}</span>
+                <span className={css.itemDesc}>{t('defineModeDescription')}</span>
+              </span>
+            ),
+          }] : []),
+        ]}
+        selectedId={state.current}
+        onSelect={(id) => {
+          setOpen(false)
+          if (id === DEFINE_MODE_ID) {
+            setDefineOpen(true)
+            return
+          }
+          void select(id)
+        }}
+        align="start"
+        portal
+        anchor={(
+          <button
+            type="button"
+            className={css.seat}
+            aria-haspopup="menu"
+            aria-expanded={open}
+            title={state.error ?? t('seatHint')}
+            disabled={state.busy}
+            onClick={() => { setOpen(value => !value) }}
+          >
+            <IconAgentPresetOutline16 className={introducing ? `${css.seatIcon} ${css.introIcon}` : css.seatIcon} />
+            {shownLabel}
+            <IconChevronDownOutline14 className={css.chevron} />
+          </button>
+        )}
+      />
+      <DefineEnvironmentDialog
+        open={defineOpen}
+        onClose={() => { setDefineOpen(false) }}
+        loadCapabilities={loadCapabilities}
+        defineEnvironment={defineEnvironment}
+        suggestEnvironment={suggestEnvironment}
+        t={t}
+      />
+    </>
   )
 }

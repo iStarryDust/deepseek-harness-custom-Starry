@@ -27,9 +27,9 @@ import type { Agent, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatu
 import type {} from '@deepseek-ai/dsh-agent-presets/types'
 import { AttachmentError, admitEncodedImages } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
-import { createUserMessage, freezeMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import { BlockAssembler, createUserMessage, deepFreeze, freezeMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { errorChain } from '@deepseek-ai/dsh-llm'
-import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, GenerateOptions, MessageSource } from '@deepseek-ai/dsh-llm'
 import { isAppendSurfaceEvent, isJsonValue } from '@deepseek-ai/dsh-session'
 import type { JsonValue, Session, SessionEvent, SessionEventMap, SessionHeader, SessionId, UserMessage } from '@deepseek-ai/dsh-session'
 import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
@@ -968,6 +968,83 @@ function memoryUnavailable<T>(request: import('./api/rpc.ts').RpcRequest<unknown
     message: 'the agent-memory plugin is not mounted on this deployment',
     details: {},
   }) as import('./api/rpc.ts').RpcResponse<T>
+}
+
+/** The system instruction for the environment-analysis one-shot call. */
+const ENVIRONMENT_SYSTEM_PROMPT =
+  'You are analyzing a coding-agent working environment. Given a human description of the work '
+  + 'to be done, decide which capability groups the agent needs. The description may be terse; '
+  + 'read the intent. Return ONLY a JSON array of capability group ids, for example '
+  + '["shell","files","web"]. Do not explain, do not add prose, and do not include ids not listed.'
+
+/** Frame the capability catalog and the description for the model. */
+function environmentPrompt(description: string, palette: readonly { id: string; name: string; description: string }[]): string {
+  const catalog = palette.map(group => `- "${group.id}": ${group.name} — ${group.description}`).join('\n')
+  return `Goal description: ${description}\n\nAvailable capability groups:\n${catalog}`
+}
+
+/** Best-effort parse of a JSON array (or bare id tokens) the model returned. */
+function parseCapabilityIds(
+  text: string,
+  palette: readonly { id: string; name: string; description: string }[],
+): string[] {
+  const valid = new Set(palette.map(group => group.id))
+  let candidates: string[] = []
+  const arrayMatch = /\[[^\]\n]*\]/.exec(text.trim())
+  if (arrayMatch !== null) {
+    try {
+      const parsed = JSON.parse(arrayMatch[0]) as unknown
+      if (Array.isArray(parsed)) candidates = parsed.filter((value): value is string => typeof value === 'string')
+    } catch {
+      // Fall through to a token scan when the model wrapped the array in prose.
+    }
+  }
+  if (candidates.length === 0) {
+    candidates = [...text.matchAll(/"([a-z0-9-]+)"/g)]
+      .map(match => match[1])
+      .filter((id): id is string => id !== undefined)
+  }
+  return [...new Set(candidates)].filter(id => valid.has(id))
+}
+
+/**
+ * One-shot model analysis of an environment description into capability ids,
+ * using the session's own model route. Throws when the model call fails or
+ * yields nothing — callers fall back to the deterministic keyword analysis.
+ */
+async function suggestEnvironmentWithModel(
+  ctx: Context,
+  route: { provider: string; model: string },
+  sessionId: SessionId,
+  description: string,
+  palette: readonly { id: string; name: string; description: string }[],
+  signal?: AbortSignal,
+): Promise<string[]> {
+  const options: GenerateOptions = deepFreeze({
+    provider: route.provider,
+    model: route.model,
+    messages: [createUserMessage({
+      content: [{ type: 'text', text: environmentPrompt(description, palette) }],
+      source: { kind: 'plugin', plugin: 'dsh-agent-presets' },
+    })],
+    system: ENVIRONMENT_SYSTEM_PROMPT,
+    maxTokens: 512,
+    sessionId,
+    ...signal === undefined ? {} : { signal },
+  })
+  const assembler = new BlockAssembler()
+  for await (const chunk of ctx.llm.stream(options)) {
+    signal?.throwIfAborted()
+    assembler.push(chunk)
+  }
+  const blocks = assembler.blocks()
+  const text = blocks
+    .filter((block): block is Extract<(typeof blocks)[number], { type: 'text' }> => block.type === 'text')
+    .map(block => block.text)
+    .join('')
+  const parsed = parseCapabilityIds(text, palette)
+  if (parsed.length === 0) throw new Error('agent-presets: the model suggested no capability groups')
+  return parsed
 }
 
 /** Map one authoring/roster failure onto its wire code. */
@@ -2294,26 +2371,22 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           })
         }
         let persisted = false
-        if ('error' in found) {
-          // Not live: the deletion still works when the session exists in
-          // persistence, and fails loud when it is unknown everywhere.
-          try {
-            persisted = (await persistence.list())
-              .some(header => header.id === sessionId)
-          } catch (error) {
-            return err(request, {
-              code: 'internal',
-              message: `cannot enumerate persisted sessions: ${String(error)}`,
-              details: {},
-            })
-          }
-          if (!persisted) {
-            return err(request, {
-              code: 'session-not-found',
-              message: `session "${sessionId}" is neither live nor persisted`,
-              details: { sessionId },
-            })
-          }
+        try {
+          persisted = (await persistence.list())
+            .some(header => header.id === sessionId)
+        } catch (error) {
+          return err(request, {
+            code: 'internal',
+            message: `cannot enumerate persisted sessions: ${String(error)}`,
+            details: {},
+          })
+        }
+        if ('error' in found && !persisted) {
+          return err(request, {
+            code: 'session-not-found',
+            message: `session "${sessionId}" is neither live nor persisted`,
+            details: { sessionId },
+          })
         }
         try {
           if (persisted) await persistence.remove(sessionId)
@@ -3105,6 +3178,19 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         })
       },
 
+      async capabilities(request) {
+        const presets = ctx.get('agentPresets')
+        if (presets === undefined) return ok(request, { groups: [] })
+        return ok(request, {
+          groups: presets.environmentGroups().map(group => ({
+            id: group.id,
+            name: group.name,
+            description: group.description,
+            defaultEnabled: group.defaultEnabled,
+          })),
+        })
+      },
+
       // Recomposing is limited to a blank session because a started
       // conversation's history was produced under its preset's tools; the
       // agent and the session survive, only the composition is swapped.
@@ -3154,6 +3240,63 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           return await turn
         } finally {
           if (presetSwitches.get(sessionId) === turn) presetSwitches.delete(sessionId)
+        }
+      },
+
+      // Composing an environment returns a combined preset id the caller then
+      // binds to a blank session via `select`. The Host owns the `standard`
+      // base and the agent's identity, so the caller only says which
+      // capability groups to KEEP — it never names plugins.
+      async composeEnvironment(request) {
+        const { agentId, name, description, groups } = request.payload
+        const presets = ctx.get('agentPresets')
+        if (presets === undefined) return err(request, noRoster(agentId))
+        try {
+          const agent = await presets.resolve(agentId)
+          const combinedId = await presets.composeEnvironment(agentId, {
+            name,
+            language: agent.language ?? '',
+            persona: agent.persona ?? '',
+            ...description === undefined ? {} : { description },
+          }, groups)
+          return ok(request, { agentPreset: combinedId })
+        } catch (error: unknown) {
+          return err(request, presetError(agentId, error))
+        }
+      },
+
+      // A model-backed one-shot analysis of the description, falling back to a
+      // deterministic keyword analysis when the session route cannot answer.
+      async suggestEnvironment(request, signal) {
+        const { sessionId, description } = request.payload
+        const presets = ctx.get('agentPresets')
+        if (presets === undefined) return err(request, noRoster(String(sessionId)))
+        try {
+          const found = await agentFor(sessionId)
+          if ('error' in found) return err(request, found.error)
+          const palette = presets.environmentGroups()
+          const validIds = new Set(palette.map(group => group.id))
+          let suggested: string[]
+          try {
+            const route = selectionFor(found.agent).current
+            suggested = await suggestEnvironmentWithModel(
+              ctx,
+              { provider: route.provider, model: route.model },
+              sessionId,
+              description,
+              palette,
+              signal,
+            )
+          } catch {
+            suggested = [...presets.suggestCapabilityGroups(description)]
+          }
+          const validated = [...new Set(suggested)].filter(id => validIds.has(id))
+          // Merge the deployment's default capability set so a fresh
+          // environment keeps its usual baseline alongside the recommendation.
+          const merged = [...new Set([...presets.defaultEnvironmentGroups(), ...validated])]
+          return ok(request, { groups: merged })
+        } catch (error: unknown) {
+          return err(request, { code: 'internal', message: String(error), details: {} })
         }
       },
 

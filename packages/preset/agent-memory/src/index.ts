@@ -79,7 +79,7 @@ export const GLOBAL_MEMORY_ORDER = PERSONA_ORDER + 1
 export const AGENT_MEMORY_ORDER = PERSONA_ORDER + 2
 
 /** Combined preset ids are `<agentId>-<modeId>`; drop the mode to reach the agent. */
-const COMBINED_PRESET_RE = /^(.+)-(?:standard|code|minimal)$/
+const COMBINED_PRESET_RE = /^(.+)-(?:standard|code|minimal|env-[a-z0-9-]+)$/
 
 /**
  * Deduc the owning user-agent id from a preset id: a combined

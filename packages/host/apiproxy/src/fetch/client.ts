@@ -44,9 +44,11 @@ import {
 } from '../api/workspace.schema.ts'
 import { skillListValueSchema } from '../api/skills.schema.ts'
 import {
+  agentPresetCapabilitiesValueSchema, agentPresetComposeEnvironmentValueSchema,
   agentPresetCopyValueSchema, agentPresetCreateValueSchema, agentPresetListValueSchema,
   agentPresetOpenDocumentValueSchema, agentPresetReadValueSchema, agentPresetRemoveValueSchema,
-  agentPresetSelectValueSchema, agentPresetUpdateValueSchema,
+  agentPresetSelectValueSchema, agentPresetSuggestEnvironmentValueSchema,
+  agentPresetUpdateValueSchema,
 } from '../api/agent-presets.schema.ts'
 import {
   agentMemoryReadAgentValueSchema,
@@ -140,6 +142,9 @@ export interface IApiClient {
   agentPresets: {
     list(payload: RequestPayload<'agentPreset.list'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.list'>>>
     select(payload: RequestPayload<'agentPreset.select'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.select'>>>
+    capabilities(payload: RequestPayload<'agentPreset.capabilities'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.capabilities'>>>
+    composeEnvironment(payload: RequestPayload<'agentPreset.composeEnvironment'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.composeEnvironment'>>>
+    suggestEnvironment(payload: RequestPayload<'agentPreset.suggestEnvironment'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.suggestEnvironment'>>>
     read(payload: RequestPayload<'agentPreset.read'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.read'>>>
     copy(payload: RequestPayload<'agentPreset.copy'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.copy'>>>
     create(payload: RequestPayload<'agentPreset.create'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'agentPreset.create'>>>
@@ -226,6 +231,9 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'skill.list': skillListValueSchema,
   'agentPreset.list': agentPresetListValueSchema,
   'agentPreset.select': agentPresetSelectValueSchema,
+  'agentPreset.capabilities': agentPresetCapabilitiesValueSchema,
+  'agentPreset.composeEnvironment': agentPresetComposeEnvironmentValueSchema,
+  'agentPreset.suggestEnvironment': agentPresetSuggestEnvironmentValueSchema,
   'agentPreset.read': agentPresetReadValueSchema,
   'agentPreset.copy': agentPresetCopyValueSchema,
   'agentPreset.create': agentPresetCreateValueSchema,
@@ -500,6 +508,9 @@ export abstract class AbstractApiClient implements IApiClient {
   readonly agentPresets: IApiClient['agentPresets'] = {
     list: (payload, signal) => this.callUnary('agentPreset.list', payload, signal),
     select: (payload, signal) => this.callUnary('agentPreset.select', payload, signal),
+    capabilities: (payload, signal) => this.callUnary('agentPreset.capabilities', payload, signal),
+    composeEnvironment: (payload, signal) => this.callUnary('agentPreset.composeEnvironment', payload, signal),
+    suggestEnvironment: (payload, signal) => this.callUnary('agentPreset.suggestEnvironment', payload, signal),
     read: (payload, signal) => this.callUnary('agentPreset.read', payload, signal),
     copy: (payload, signal) => this.callUnary('agentPreset.copy', payload, signal),
     create: (payload, signal) => this.callUnary('agentPreset.create', payload, signal),

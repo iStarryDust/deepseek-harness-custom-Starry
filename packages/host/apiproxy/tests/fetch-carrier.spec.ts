@@ -212,6 +212,18 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
         const value = { agentPreset: request.payload.agentPreset }
         return Promise.resolve({ rpcId: request.rpcId, result: { ok: true as const, value } })
       },
+      capabilities(request: RpcRequest<{}>) {
+        const value = { groups: [] }
+        return Promise.resolve({ rpcId: request.rpcId, result: { ok: true as const, value } })
+      },
+      composeEnvironment(request: RpcRequest<{ agentId: string }>) {
+        const value = { agentPreset: `${request.payload.agentId}-env-x` }
+        return Promise.resolve({ rpcId: request.rpcId, result: { ok: true as const, value } })
+      },
+      suggestEnvironment(request: RpcRequest<{ sessionId: string; description: string }>) {
+        const value = { groups: [] }
+        return Promise.resolve({ rpcId: request.rpcId, result: { ok: true as const, value } })
+      },
       read(request: RpcRequest<{ agentPreset: string }>) {
         const value = { agentPreset: request.payload.agentPreset, trust: 'user' as const, content: '' }
         return Promise.resolve({ rpcId: request.rpcId, result: { ok: true as const, value } })

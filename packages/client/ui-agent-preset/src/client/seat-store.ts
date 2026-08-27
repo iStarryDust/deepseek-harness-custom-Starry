@@ -29,6 +29,29 @@ const META_PRESET_ID = 'cordis'
 /** The mode a chat from an agent page starts with when the user does not pick. */
 const DEFAULT_MODE_ID = 'standard'
 
+/** The synthetic hero menu id for the "定义模式 / Define mode" entry. */
+export const DEFINE_MODE_ID = '__define__'
+
+/**
+ * A combined preset id is `<agentId>-<modeId>`. Used to recover the owning
+ * agent from the current session's preset, so the environment entry stays
+ * available on an agent's blank session even after the initial stage was
+ * applied and the pending-chat context was consumed.
+ */
+const COMBINED_PRESET_RE = /^(.+)-(standard|code|minimal|env-[a-z0-9-]+)$/
+
+/** One toggleable capability group offered by the environment picker. */
+export interface EnvironmentCapability {
+  /** Stable group id; the picker localizes the label, the id addresses. */
+  readonly id: string
+  /** English display name, the fallback when a locale has no key. */
+  readonly name: string
+  /** English one-line description, the fallback when a locale has no key. */
+  readonly description: string
+  /** Whether a fresh environment pre-selects this group in the picker. */
+  readonly defaultEnabled: boolean
+}
+
 /** The chat-time agent context published by ui-agents, when present. */
 export interface AgentChatContext {
   /** The agent a pending chat-start belongs to, absent otherwise. */
@@ -56,10 +79,16 @@ export interface AgentPresetSeatState {
    * chip); the renderer clears it via `introduced()` once played.
    */
   introduce: boolean
+  /**
+   * Whether the chip can offer a per-agent environment ("定义模式"). An
+   * environment nests under its owning agent, so it is only offered while a
+   * chat-start from an agent page still has its pending agent.
+   */
+  canDefine: boolean
 }
 
 const INITIAL: AgentPresetSeatState = {
-  options: [], current: '', error: null, busy: false, introduce: false,
+  options: [], current: '', error: null, busy: false, introduce: false, canDefine: false,
 }
 
 /** One session's identity and whether it has started. */
@@ -115,6 +144,31 @@ export class AgentPresetSeatController {
   }
 
   /**
+   * The owning agent of the current session's preset, when it is a combined
+   * preset belonging to an agent. Lets the environment entry serve an agent's
+   * blank session even when the pending-chat context (ui-agents) has already
+   * been consumed by an applied pick.
+   * @returns the agent id, or undefined when the session runs no combined preset.
+   */
+  private agentIdOfCurrent(): string | undefined {
+    const agentPreset = this.currentSession()?.agentPreset
+    if (agentPreset === undefined) return undefined
+    return COMBINED_PRESET_RE.exec(agentPreset)?.[1]
+  }
+
+  /**
+   * Whether the hero can offer a per-agent environment. An environment nests
+   * under its owning agent, so it needs an agent to own it: either the pending
+   * chat-start agent, or the agent the current blank session already runs a
+   * combined preset for.
+   */
+  private canDefine(): boolean {
+    if (this.agentContext?.pendingAgent() !== undefined) return true
+    const session = this.currentSession()
+    return session !== undefined && session.blank && this.agentIdOfCurrent() !== undefined
+  }
+
+  /**
    * Read the mode roster and open the chip on the deployment default.
    * @returns once the snapshot reflects the host.
    */
@@ -143,6 +197,10 @@ export class AgentPresetSeatController {
         current: this.staged === undefined
           ? this.displayId(this.currentSession()?.agentPreset ?? this.fallback)
           : this.displayId(this.staged),
+        // An environment nests under its owning agent, so offer "定义模式"
+        // whenever there is an agent to own it — pending or already running a
+        // combined preset on the current blank session.
+        canDefine: this.canDefine(),
         error: null,
       })
     } catch (error) {
@@ -216,7 +274,7 @@ export class AgentPresetSeatController {
         return
       }
       // Consumed: the next new session opens on the deployment default again.
-      this.set({ busy: false, current: this.displayId(response.result.value.agentPreset) })
+      this.set({ busy: false, current: this.displayId(response.result.value.agentPreset), canDefine: this.canDefine() })
       this.onApplied?.(session.id, response.result.value.agentPreset)
       // The chat bound; an agent-page start's pending context is spent.
       this.agentContext?.consumePendingAgent()
@@ -224,5 +282,76 @@ export class AgentPresetSeatController {
       this.staged = undefined
       this.set({ busy: false, error: messageOf(error), current: this.fallback })
     }
+  }
+
+  /**
+   * Read the toggleable capability palette the environment picker renders.
+   * @returns one entry per group, or an empty list with an error on the chip.
+   */
+  async loadCapabilities(): Promise<EnvironmentCapability[]> {
+    const response = await this.api.agentPresets.capabilities({})
+    if (!response.result.ok) {
+      this.set({ error: response.result.error.message })
+      return []
+    }
+    return [...response.result.value.groups]
+  }
+
+  /**
+   * Compose one per-agent environment and bind it to the current blank
+   * session. The picked groups are authoritative the caller may only KEEP the
+   * groups it checked — the Host builds the subset, so no plugin text crosses
+   * the wire. On success the environment preset replaces the staged choice and
+   * is applied immediately when a blank session is current.
+   * @param name - the environment's display name.
+   * @param description - a one-line note, when provided.
+   * @param groups - the capability groups the environment keeps.
+   * @returns the composed combined preset id, or undefined when there is no
+   * pending agent, composition failed, or the apply was refused.
+   */
+  async defineEnvironment(
+    name: string,
+    description: string,
+    groups: readonly string[],
+  ): Promise<string | undefined> {
+    const agentId = this.agentContext?.pendingAgent() ?? this.agentIdOfCurrent()
+    if (agentId === undefined) return undefined
+    const response = await this.api.agentPresets.composeEnvironment({
+      agentId,
+      name,
+      ...description === '' ? {} : { description },
+      groups,
+    })
+    if (!response.result.ok) {
+      this.set({ error: response.result.error.message })
+      return undefined
+    }
+    const combinedId = response.result.value.agentPreset
+    this.stage(combinedId)
+    await this.apply()
+    return combinedId
+  }
+
+  /**
+   * Analyze an environment description and return the capability group ids the
+   * deployment recommends (a model-backed analysis on the Host, falling back to
+   * a deterministic keyword analysis). The suggestion already merges the
+   * deployment's default capability set.
+   * @param description - the environment description (name or note).
+   * @returns the recommended capability ids, or an empty list when no current
+   * session could back the analysis or the Host answered an error.
+   */
+  async suggestEnvironment(description: string): Promise<string[]> {
+    const session = this.currentSession()
+    if (session === undefined) return []
+    const response = await this.api.agentPresets.suggestEnvironment({
+      sessionId: session.id,
+      description,
+    })
+    if (!response.result.ok) {
+      this.set({ error: response.result.error.message })
+      return []
+    }
+    return [...response.result.value.groups]
   }
 }
