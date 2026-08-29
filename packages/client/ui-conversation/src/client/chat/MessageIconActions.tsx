@@ -31,8 +31,6 @@ export interface MessageIconActionsProps {
   onEdit?: (() => void) | undefined
   /** The agent is running, so edit stays visible but unavailable. */
   editUnavailable?: boolean | undefined
-  /** Why the edit action is unavailable; falls back to the generic running notice. */
-  editUnavailableReason?: string | undefined
   /** Parent layout class composed onto the actions row. */
   className?: string | undefined
   /** Slot-rendered actions owned by independent plugins, placed between the
@@ -58,7 +56,7 @@ export interface MessageIconActionsProps {
  */
 export function MessageIconActions({
   text, time, runMs, ttftMs, tokensPerSecond, clock, onBranch, branchUnavailable = false,
-  onEdit, editUnavailable = false, editUnavailableReason, className,
+  onEdit, editUnavailable = false, className,
   extraActions, clockMeta, t,
 }: MessageIconActionsProps) {
   const day = useCalendarDay()
@@ -138,12 +136,7 @@ export function MessageIconActions({
         </button>
       </Tooltip>
       {onEdit !== undefined && (
-        <Tooltip
-          label={editUnavailable
-            ? (editUnavailableReason ?? t('message.edit.unavailable'))
-            : t('message.edit')}
-          side="bottom"
-        >
+        <Tooltip label={editUnavailable ? t('message.edit.unavailable') : t('message.edit')} side="bottom">
           {/* Native disabled buttons do not deliver the hover/focus events Tooltip needs. */}
           <button
             type="button"
@@ -159,9 +152,7 @@ export function MessageIconActions({
         </Tooltip>
       )}
       {onEdit !== undefined && editUnavailable && (
-        <span id={editReasonId} className={css.visuallyHidden}>
-          {editUnavailableReason ?? t('message.edit.unavailable')}
-        </span>
+        <span id={editReasonId} className={css.visuallyHidden}>{t('message.edit.unavailable')}</span>
       )}
       {extraActions}
       {onBranch !== undefined && (

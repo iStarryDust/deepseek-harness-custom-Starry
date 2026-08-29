@@ -492,18 +492,24 @@ export function apply(ctx: Context): void {
             if (start === undefined || start > seq) break
             targetIdx = index
           }
-          if (targetIdx < 0) {
-            throw new Error(
-              `the turn containing event ${String(seq)} is outside the loaded window`
-              + ' (the context was compacted)',
-            )
-          }
           let childId: SessionId
           // Only the fork path owns the child it creates; a first-turn
           // connect may reuse an existing blank session, which cleanup must
           // never touch.
           let forked: boolean
-          if (targetIdx === 0) {
+          if (targetIdx < 0) {
+            // The loaded window no longer carries the message's turn
+            // (long-session eviction / compaction), so the local timeline
+            // cannot resolve the cut: anchor by the message itself and let
+            // the host resolve the boundary from the full log (an empty seed
+            // when the message sits in the log's first turn).
+            childId = await sessions.fork({
+              sessionId,
+              beforeTurnAtSeq: seq,
+              increaseTitle: true,
+            })
+            forked = true
+          } else if (targetIdx === 0) {
             // The first turn: the regenerated conversation starts from a
             // blank session on the same Workspace (reused when one exists,
             // else freshly created) — no history survives the rewrite.

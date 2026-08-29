@@ -625,6 +625,22 @@ export interface ApiProxyDefaults {
 
 /** The tool/call payload fields the presenter path reads. */
 interface ToolCallData { callId: string; name: string; arguments: string }
+
+/**
+ * Agent-memory service face resolved from the context. Typed locally so the
+ * api-proxy does not add a cross-package dependency on the optional
+ * `dsh-agent-memory` plugin; `ctx.get('agentMemory')` otherwise yields `any`.
+ */
+interface AgentMemoryServiceFace {
+  readGlobal(): string
+  writeGlobal(text: string): void
+  readAgent(agentId: string): string
+  writeAgent(agentId: string, text: string): void
+  remember(
+    agent: Agent,
+    text: string,
+  ): Promise<{ saved: boolean; agentId?: string; outcome?: string; entries?: string[] }>
+}
 /**
  * One outstanding approval question: the stable server-request id, the frame
  * material replayed to late mux subscribers, and the resolver that settles the
@@ -2403,7 +2419,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       },
 
       async fork(request) {
-        const { sessionId, atSeq } = request.payload
+        const { sessionId, atSeq, beforeTurnAtSeq } = request.payload
         let source: SessionReadState
         try {
           source = await readSessionState(sessionId)
@@ -2422,28 +2438,46 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         // clip backward to an earlier completed turn. Omitted and past-end
         // anchors retain the last-completed-turn shortcut.
         const lastSeq = events.at(-1)?.seq ?? -1
-        const anchoredBoundary = atSeq === undefined
-          ? undefined
-          : events.find(e => e.type === 'turn/end' && e.seq >= atSeq)
-        const boundary = anchoredBoundary
-          ?? (atSeq === undefined || atSeq > lastSeq
-            ? events.findLast(e => e.type === 'turn/end')
-            : undefined)
-        if (boundary === undefined) {
-          return err(request, {
-            code: 'fork-unavailable',
-            message: atSeq !== undefined && atSeq <= lastSeq
-              ? `session "${sessionId}" has not completed the turn containing event ${String(atSeq)}`
-              : `session "${sessionId}" has no completed turn to fork from`,
-            details: { sessionId },
-          })
+        let boundary: SessionEvent | undefined
+        if (beforeTurnAtSeq !== undefined) {
+          // The client window may no longer carry the anchored message's turn
+          // (long-session eviction / compaction): resolve the boundary from
+          // the full log — the last completed turn before the message. No
+          // such turn (the message sits in the log's first turn) yields an
+          // empty seed below, so the rewrite starts from a blank session.
+          for (const event of events) {
+            if (event.type === 'turn/end' && event.seq < beforeTurnAtSeq) boundary = event
+          }
+        } else {
+          const anchoredBoundary = atSeq === undefined
+            ? undefined
+            : events.find(e => e.type === 'turn/end' && e.seq >= atSeq)
+          boundary = anchoredBoundary
+            ?? (atSeq === undefined || atSeq > lastSeq
+              ? events.findLast(e => e.type === 'turn/end')
+              : undefined)
+          if (boundary === undefined) {
+            return err(request, {
+              code: 'fork-unavailable',
+              message: atSeq !== undefined && atSeq <= lastSeq
+                ? `session "${sessionId}" has not completed the turn containing event ${String(atSeq)}`
+                : `session "${sessionId}" has no completed turn to fork from`,
+              details: { sessionId },
+            })
+          }
         }
         // Extend the cut through trailing out-of-band appends (session/title,
         // injections) up to the next turn/start: they are standalone events, so
         // the seed stays balanced, and the child inherits a title generated
         // right after the boundary turn.
-        let cut = boundary.seq + 1
-        while (cut < events.length && events[cut]?.type !== 'turn/start') cut++
+        let cut: number
+        if (boundary === undefined) {
+          // A beforeTurnAtSeq anchor inside the log's first turn: empty seed.
+          cut = 0
+        } else {
+          cut = boundary.seq + 1
+          while (cut < events.length && events[cut]?.type !== 'turn/start') cut++
+        }
         let workspace: Workspace | undefined
         try {
           workspace = await forkWorkspace(source)
@@ -3178,17 +3212,17 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         })
       },
 
-      async capabilities(request) {
+      capabilities(request) {
         const presets = ctx.get('agentPresets')
-        if (presets === undefined) return ok(request, { groups: [] })
-        return ok(request, {
+        if (presets === undefined) return Promise.resolve(ok(request, { groups: [] }))
+        return Promise.resolve(ok(request, {
           groups: presets.environmentGroups().map(group => ({
             id: group.id,
             name: group.name,
             description: group.description,
             defaultEnabled: group.defaultEnabled,
           })),
-        })
+        }))
       },
 
       // Recomposing is limited to a blank session because a started
@@ -3404,34 +3438,36 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     },
 
     agentMemory: {
-      async readGlobal(request) {
-        const memory = ctx.get('agentMemory')
-        if (memory === undefined) return memoryUnavailable(request)
-        return ok(request, { text: memory.readGlobal() })
+      readGlobal(request) {
+        const memory = ctx.get('agentMemory') as AgentMemoryServiceFace | undefined
+        if (memory === undefined) return Promise.resolve(memoryUnavailable(request))
+        return Promise.resolve(ok(request, { text: memory.readGlobal() }))
       },
 
-      async writeGlobal(request) {
-        const memory = ctx.get('agentMemory')
-        if (memory === undefined) return memoryUnavailable(request)
+      writeGlobal(request) {
+        const memory = ctx.get('agentMemory') as AgentMemoryServiceFace | undefined
+        if (memory === undefined) return Promise.resolve(memoryUnavailable(request))
         memory.writeGlobal(request.payload.text)
-        return ok(request, {})
+        return Promise.resolve(ok(request, {}))
       },
 
-      async readAgent(request) {
-        const memory = ctx.get('agentMemory')
-        if (memory === undefined) return memoryUnavailable(request)
-        return ok(request, { agentId: request.payload.agentId, text: memory.readAgent(request.payload.agentId) })
+      readAgent(request) {
+        const memory = ctx.get('agentMemory') as AgentMemoryServiceFace | undefined
+        if (memory === undefined) return Promise.resolve(memoryUnavailable(request))
+        return Promise.resolve(ok(request, {
+          agentId: request.payload.agentId, text: memory.readAgent(request.payload.agentId),
+        }))
       },
 
-      async writeAgent(request) {
-        const memory = ctx.get('agentMemory')
-        if (memory === undefined) return memoryUnavailable(request)
+      writeAgent(request) {
+        const memory = ctx.get('agentMemory') as AgentMemoryServiceFace | undefined
+        if (memory === undefined) return Promise.resolve(memoryUnavailable(request))
         memory.writeAgent(request.payload.agentId, request.payload.text)
-        return ok(request, { agentId: request.payload.agentId })
+        return Promise.resolve(ok(request, { agentId: request.payload.agentId }))
       },
 
       async remember(request) {
-        const memory = ctx.get('agentMemory')
+        const memory = ctx.get('agentMemory') as AgentMemoryServiceFace | undefined
         if (memory === undefined) return memoryUnavailable(request)
         const found = await agentFor(request.payload.sessionId)
         if ('error' in found) return err(request, found.error)

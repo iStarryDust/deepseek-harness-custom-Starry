@@ -487,22 +487,6 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
 }: ChatNodeViewProps<'user' | 'steering'>) {
   const data = node.data
   const running = useSession(snapshot => snapshot.running)
-  const timeline = useSession(snapshot => snapshot.chat.timeline)
-  // Same anchoring rule as rewriteFrom: the message must sit inside a turn
-  // the loaded window still carries. Compaction can drop a turn's start from
-  // the window while the message itself stays visible, and editing such a
-  // message can never find its fork boundary.
-  const editEnclosed = useMemo(() => {
-    const { turnOrder, turns } = timeline
-    for (let index = 0; index < turnOrder.length; index++) {
-      const turn = turnOrder[index]
-      if (turn === undefined) break
-      const start = turns.get(turn)?.start?.seq
-      if (start === undefined || start > data.seq) break
-      return true
-    }
-    return false
-  }, [timeline, data.seq])
   const [editing, setEditing] = useState(false)
   const { images } = useMemo(() => contentParts(data.content), [data.content])
   if (editing) {
@@ -533,8 +517,7 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
           clock="start"
           className={css.actions}
           onEdit={data.kind === 'user' ? () => { setEditing(true) } : undefined}
-          editUnavailable={running || !editEnclosed}
-          editUnavailableReason={running ? undefined : t('message.edit.unavailable.window')}
+          editUnavailable={running}
           t={t}
         />
       )}

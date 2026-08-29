@@ -2420,7 +2420,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         return ok(request, { removed: true })
       },
       fork: (request) => {
-        const { sessionId, atSeq } = request.payload
+        const { sessionId, atSeq, beforeTurnAtSeq } = request.payload
         const source = summaryOf(sessionId)
         if (source === undefined) {
           return err(request, {
@@ -2431,24 +2431,39 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         }
         const log = logs.get(sessionId) ?? []
         const lastSeq = log.at(-1)?.seq ?? -1
-        const anchoredBoundary = atSeq === undefined
-          ? undefined
-          : log.find(e => e.type === 'turn/end' && e.seq >= atSeq)
-        const boundary = anchoredBoundary
-          ?? (atSeq === undefined || atSeq > lastSeq
-            ? log.findLast(e => e.type === 'turn/end')
-            : undefined)
-        if (boundary === undefined) {
-          return err(request, {
-            code: 'fork-unavailable',
-            message: atSeq !== undefined && atSeq <= lastSeq
-              ? `session ${sessionId} has not completed the turn containing event ${String(atSeq)}`
-              : `session ${sessionId} has no completed turn`,
-            details: { sessionId },
-          })
+        let boundary: (typeof log)[number] | undefined
+        if (beforeTurnAtSeq !== undefined) {
+          // Mirrors the host: the last completed turn before the anchored
+          // message, resolved from the full log; none means an empty seed.
+          for (const event of log) {
+            if (event.type === 'turn/end' && event.seq < beforeTurnAtSeq) boundary = event
+          }
+        } else {
+          const anchoredBoundary = atSeq === undefined
+            ? undefined
+            : log.find(e => e.type === 'turn/end' && e.seq >= atSeq)
+          boundary = anchoredBoundary
+            ?? (atSeq === undefined || atSeq > lastSeq
+              ? log.findLast(e => e.type === 'turn/end')
+              : undefined)
+          if (boundary === undefined) {
+            return err(request, {
+              code: 'fork-unavailable',
+              message: atSeq !== undefined && atSeq <= lastSeq
+                ? `session ${sessionId} has not completed the turn containing event ${String(atSeq)}`
+                : `session ${sessionId} has no completed turn`,
+              details: { sessionId },
+            })
+          }
         }
-        let cut = boundary.seq + 1
-        while (cut < log.length && log[cut]?.type !== 'turn/start') cut++
+        let cut: number
+        if (boundary === undefined) {
+          // A beforeTurnAtSeq anchor inside the log's first turn: empty seed.
+          cut = 0
+        } else {
+          cut = boundary.seq + 1
+          while (cut < log.length && log[cut]?.type !== 'turn/start') cut++
+        }
         const child: SessionSummary = {
           sessionId: sid(`fx-${nextSession++}`), updatedAt: Date.now(), running: false, blank: false,
           parentSessionId: sessionId,

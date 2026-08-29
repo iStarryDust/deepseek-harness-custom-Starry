@@ -223,6 +223,49 @@ describe('sessions.fork', () => {
     await ctx.fiber.dispose()
   })
 
+  it('cuts before the anchored message turn when the client window lacks it', async () => {
+    const ctx = await composed()
+    const source = liveAgent(ctx, 'session-window', 3)
+    // The edited message: the last user/message (turn 3). The host resolves
+    // the boundary from the full log — the last completed turn before it.
+    const anchor = source.events.findLast(event => event.type === 'user/message')?.seq ?? 0
+    const response = await api(ctx).sessions.fork(request({ sessionId: source.id, beforeTurnAtSeq: anchor }))
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) return
+    expect(ctx.sessions.get(response.result.value.sessionId)?.events.map(event => event.type)).toEqual([
+      'turn/start', 'user/message', 'turn/end',
+      'turn/start', 'user/message', 'turn/end',
+      'session/end-seed',
+    ])
+    await ctx.fiber.dispose()
+  })
+
+  it('forks an empty seed when the anchored message sits in the first turn', async () => {
+    const ctx = await composed()
+    const source = liveAgent(ctx, 'session-first', 2)
+    const anchor = source.events.find(event => event.type === 'user/message')?.seq ?? 0
+    const response = await api(ctx).sessions.fork(request({ sessionId: source.id, beforeTurnAtSeq: anchor }))
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) return
+    const child = ctx.sessions.get(response.result.value.sessionId)
+    expect(child?.events.some(event => event.type === 'turn/start')).toBe(false)
+    await ctx.fiber.dispose()
+  })
+
+  it('falls back to the last completed turn for a past-end beforeTurnAtSeq anchor', async () => {
+    const ctx = await composed()
+    const source = liveAgent(ctx, 'session-past', 2)
+    const response = await api(ctx).sessions.fork(request({ sessionId: source.id, beforeTurnAtSeq: 999 }))
+    expect(response.result.ok).toBe(true)
+    if (!response.result.ok) return
+    expect(ctx.sessions.get(response.result.value.sessionId)?.events.map(event => event.type)).toEqual([
+      'turn/start', 'user/message', 'turn/end',
+      'turn/start', 'user/message', 'turn/end',
+      'session/end-seed',
+    ])
+    await ctx.fiber.dispose()
+  })
+
   it('cuts through an aborted turn: stopped is closed, not open', async () => {
     const ctx = await composed()
     const source = liveAgent(ctx, 'session-aborted', 1, 'aborted')

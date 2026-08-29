@@ -137,10 +137,11 @@ export const sessionRemoveValueSchema = z.object({
   removed: z.literal(true),
 }) satisfies z.ZodType<Wire<ResponseValue<'session.remove'>>>
 
-/** session.fork request payload (atSeq anchors the completed-turn cut). */
+/** session.fork request payload (atSeq or beforeTurnAtSeq anchor the completed-turn cut). */
 export const sessionForkRequestSchema = z.object({
   sessionId: sessionIdSchema,
   atSeq: z.number().int().nonnegative().optional(),
+  beforeTurnAtSeq: z.number().int().nonnegative().optional(),
 }) satisfies z.ZodType<Wire<RequestPayload<'session.fork'>>>
 
 /** session.fork response value (the child session id). */
