@@ -13,7 +13,7 @@ import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts
 import type {
   ChatConversationViewNode, ConversationNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ChatNodeViewProps } from '../src/client/contract/slots.ts'
+import type { ChatNodeOwnerProps, ChatNodeViewProps } from '../src/client/contract/slots.ts'
 import {
   formatMessageClock, msUntilNextLocalMidnight, startOfLocalDay,
 } from '../src/client/chat/message-chrome.ts'
@@ -49,10 +49,40 @@ interface MessageItemProps {
   readonly node: ConversationNode
   readonly t: ChatNodeViewProps['t']
   readonly referenceLabels?: readonly string[]
+  /** Fixture-observable running bit behind the standard `useSession` kit. */
+  readonly running?: boolean
+  /** Records the edit-and-regenerate request instead of forking a session. */
+  readonly rewriteFrom?: ChatNodeOwnerProps['rewriteFrom']
+  /** Overrides the editor's browser image operations (drafts, kept URLs). */
+  readonly editImageTools?: ChatNodeOwnerProps['editImageTools']
+}
+
+/** Standard-kit doubles shared by every fixture render (idle session). */
+const idleSessionSource = {
+  getSnapshot: () => ({ running: false }),
+  subscribe: () => () => {},
+}
+const fixtureUseSession = bindSnapshotSelector(idleSessionSource) as unknown as ChatNodeViewProps['useSession']
+const noopRewriteFrom: ChatNodeOwnerProps['rewriteFrom'] = () => Promise.resolve()
+const fixtureEditImageTools: ChatNodeOwnerProps['editImageTools'] = {
+  createDraft: files => ({
+    ok: true as const,
+    attachments: files.map((file, index) => ({
+      kind: 'image' as const,
+      id: `draft-${index}` as never,
+      previewUrl: `blob:fixture-${index}`,
+      file,
+    })),
+  }),
+  releaseDrafts: () => {},
+  resolveKept: attachment => Promise.resolve(`blob:kept-${attachment.attachmentId}`),
 }
 
 /** Legacy-node fixture adapter for the independently registered renderers. */
-function MessageItem({ node, t: translate, referenceLabels }: MessageItemProps) {
+function MessageItem({
+  node, t: translate, referenceLabels, running = false, rewriteFrom = noopRewriteFrom,
+  editImageTools = fixtureEditImageTools,
+}: MessageItemProps) {
   const kind = node.kind === 'assistant' ? 'assistant-step' : node.kind
   const viewNode: ChatConversationViewNode = {
     key: `fixture:${node.kind}:${node.seq}`,
@@ -68,7 +98,10 @@ function MessageItem({ node, t: translate, referenceLabels }: MessageItemProps) 
         ? { ...node, referenceLabels }
         : node,
   }
-  const props = { node: viewNode, t: translate, renderMessageImages } as ChatNodeViewProps
+  const useSession = running
+    ? (bindSnapshotSelector({ getSnapshot: () => ({ running: true }), subscribe: () => () => {} }) as unknown as ChatNodeViewProps['useSession'])
+    : fixtureUseSession
+  const props = { node: viewNode, t: translate, renderMessageImages, useSession, rewriteFrom, editImageTools } as ChatNodeViewProps
   switch (node.kind) {
     case 'user':
     case 'steering':
@@ -142,7 +175,7 @@ describe('MessageItem arms', () => {
     expect(view.container.textContent).toContain('README.md, please.')
   })
 
-  it('user bubbles expose clock / copy and neither branch nor edit; copy writes the text', () => {
+  it('user bubbles expose clock / copy / edit and no branch; copy writes the text', () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -162,9 +195,131 @@ describe('MessageItem arms', () => {
     expect(screen.getByText('14:24')).toBeTruthy()
     expect(screen.getByRole('button', { name: '复制' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '在新对话中分支' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '编辑' })).toBeNull()
+    expect(screen.getByRole('button', { name: '修改这条消息' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '复制' }))
     expect(writeText).toHaveBeenCalledWith('hello bubble')
+  })
+
+  it('the edit action stays visible but unavailable while the agent is running', () => {
+    render(
+      <MessageItem t={t} running node={{
+        kind: 'user', seq: 1, time: 1_000,
+        content: [{ type: 'text', text: 'busy body' }] as never,
+        source: null,
+      }} />,
+    )
+    const edit = screen.getByRole('button', { name: '修改这条消息' })
+    expect(edit.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(edit)
+    expect(screen.queryByRole('textbox')).toBeNull()
+  })
+
+  it('the inline editor prefills the joined text and hands the edit to rewriteFrom', async () => {
+    const rewriteFrom = vi.fn<(seq: number, text: string, kept: readonly never[], drafts: readonly never[]) => Promise<void>>()
+      .mockResolvedValue(undefined)
+    render(
+      <MessageItem t={t} rewriteFrom={rewriteFrom as never} node={{
+        kind: 'user', seq: 7, time: 1_000,
+        content: [{ type: 'text', text: 'original prompt' }] as never,
+        source: null,
+      }} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '修改这条消息' }))
+    const area = screen.getByRole('textbox') as HTMLTextAreaElement
+    expect(area.value).toBe('original prompt')
+    fireEvent.change(area, { target: { value: 'edited prompt' } })
+    fireEvent.click(screen.getByRole('button', { name: '重新生成' }))
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(rewriteFrom).toHaveBeenCalledWith(7, 'edited prompt', [], [])
+  })
+
+  it('the editor strips kept images, keeps the rest, and rejects unsupported picks', async () => {
+    const rewriteFrom = vi.fn<(seq: number, text: string, kept: readonly unknown[], drafts: readonly unknown[]) => Promise<void>>()
+      .mockResolvedValue(undefined)
+    const tools: ChatNodeOwnerProps['editImageTools'] = {
+      createDraft: (files) => {
+        if (files.some(file => file.type === 'text/plain')) {
+          return { ok: false as const, reason: '仅支持 PNG、JPG、WebP、GIF 格式的图片' }
+        }
+        return {
+          ok: true as const,
+          attachments: files.map((file, index) => ({
+            kind: 'image' as const, id: `draft-${index}` as never, previewUrl: `blob:d-${index}`, file,
+          })),
+        }
+      },
+      releaseDrafts: vi.fn(),
+      resolveKept: attachment => Promise.resolve(`blob:kept-${attachment.attachmentId}`),
+    }
+    render(
+      <MessageItem
+        t={t}
+        rewriteFrom={rewriteFrom as never}
+        editImageTools={tools}
+        node={{
+          kind: 'user', seq: 9, time: 1_000,
+          content: [
+            { type: 'text', text: 'two images' },
+            { type: 'image', attachment: { attachmentId: 'att-1', mediaType: 'image/png', bytes: 4, width: 1, height: 1 } },
+            { type: 'image', attachment: { attachmentId: 'att-2', mediaType: 'image/png', bytes: 4, width: 1, height: 1 } },
+          ] as never,
+          source: null,
+        }} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '修改这条消息' }))
+    const strips = await screen.findAllByRole('button', { name: '移除这张图片' })
+    expect(strips).toHaveLength(2)
+    // Remove the first kept image; the second must survive into the rewrite.
+    fireEvent.click(strips[0]!)
+    fireEvent.click(screen.getByRole('button', { name: '重新生成' }))
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    const [, , kept] = rewriteFrom.mock.calls[0]!
+    expect((kept as readonly { attachmentId: string }[]).map(ref => ref.attachmentId)).toEqual(['att-2'])
+  })
+
+  it('a pick with an unsupported type surfaces the localized reason and adds nothing', () => {
+    const releaseDrafts = vi.fn()
+    const tools: ChatNodeOwnerProps['editImageTools'] = {
+      createDraft: () => ({ ok: false as const, reason: '仅支持 PNG、JPG、WebP、GIF 格式的图片' }),
+      releaseDrafts,
+      resolveKept: attachment => Promise.resolve(`blob:kept-${attachment.attachmentId}`),
+    }
+    render(
+      <MessageItem t={t} editImageTools={tools} node={{
+        kind: 'user', seq: 5, time: 1_000,
+        content: [{ type: 'text', text: 'no images yet' }] as never,
+        source: null,
+      }} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '修改这条消息' }))
+    expect(screen.queryByRole('status')).toBeNull()
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    expect(input).not.toBeNull()
+    fireEvent.change(input, { target: { files: [new File(['x'], 'note.txt', { type: 'text/plain' })] } })
+    expect(screen.getByRole('status').textContent).toBe('仅支持 PNG、JPG、WebP、GIF 格式的图片')
+    expect(screen.queryByRole('button', { name: '移除这张图片' })).toBeNull()
+  })
+
+  it('cancelling the inline editor restores the bubble untouched', () => {
+    const view = render(
+      <MessageItem t={t} node={{
+        kind: 'user', seq: 7, time: 1_000,
+        content: [{ type: 'text', text: 'keep me' }] as never,
+        source: null,
+      }} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '修改这条消息' }))
+    const area = screen.getByRole('textbox') as HTMLTextAreaElement
+    fireEvent.change(area, { target: { value: 'changed my mind' } })
+    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+    expect(view.getByText('keep me')).toBeTruthy()
+    expect(screen.queryByRole('textbox')).toBeNull()
   })
 
   it('user copy falls back to execCommand when clipboard.writeText is unavailable', () => {
@@ -309,6 +464,7 @@ describe('MessageItem arms', () => {
     fireEvent.click(view.getByRole('button', { name: '复制' }))
     expect(writeText).toHaveBeenCalledWith('steer!')
     expect(view.queryByRole('button', { name: '在新对话中分支' })).toBeNull()
+    expect(view.queryByRole('button', { name: '修改这条消息' })).toBeNull()
   })
 
   it('context uses the Tool calls disclosure chrome and keeps its body collapsed by default', () => {

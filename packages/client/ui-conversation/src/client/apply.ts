@@ -1,6 +1,8 @@
 /** Registers the conversation components, shared store, and service callbacks. */
 import type { Context } from '@deepseek-ai/cordis'
 import { resolveSlotLabel, type BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
+import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
+import type { ConnectionHandle, PromptContentPart } from '@deepseek-ai/dsh-api-remotes/client'
 import {
   resolveWorkspacePath, type ISessions, type SessionId,
 } from '@deepseek-ai/dsh-client-runtime/client'
@@ -102,6 +104,20 @@ function concreteConversation(ctx: Context): ConversationController {
   const conversation = ctx.get('conversation') as ConversationController | undefined
   if (conversation === undefined) throw new Error('ui-conversation: conversation service unavailable')
   return conversation
+}
+
+/**
+ * Encode attachment bytes as the prompt wire's base64 data. Chunked
+ * `String.fromCharCode` keeps large images under the spread-call stack limit;
+ * `btoa` is the browser wire encoding (this module is client-bundle only).
+ */
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize))
+  }
+  return btoa(binary)
 }
 
 /** Chain routing: claim the composer while an approval wait is pending (pure — owner props only). */
@@ -422,6 +438,149 @@ export function apply(ctx: Context): void {
             .catch(() => {
               // Fork or child-rename failure keeps the source view untouched.
             })
+        },
+        editImageTools: {
+          createDraft: (files) => {
+            try {
+              return { ok: true as const, attachments: conversation.createDraftImages(files) }
+            } catch (error) {
+              return {
+                ok: false as const,
+                reason: error instanceof UnsupportedImageMediaTypeError ? t('image.unsupportedType') : String(error),
+              }
+            }
+          },
+          releaseDrafts: (attachments) => { conversation.releaseDraftImages(attachments) },
+          resolveKept: attachment => conversation.resolveImage(sessionId, attachment),
+        },
+        rewriteFrom: async (seq, text, keptRefs, drafts) => {
+          const face = sessions.binding(sessionId)?.session
+          if (face === undefined) throw new Error(`session "${sessionId}" is not locally addressable`)
+          const snapshot = face.getSnapshot()
+          if (snapshot.running) throw new Error('the agent is running')
+          // Re-admit surviving images as fresh prompt uploads: kept images
+          // ride the session-authorized attachment read, drafts re-encode
+          // their browser files, and the child stores its own durable copies
+          // through the ordinary prompt path.
+          const keptParts = await Promise.all(keptRefs.map(async (ref): Promise<PromptContentPart> => {
+            const result = await face.readAttachment(ref.attachmentId)
+            if (!result.ok) throw new Error(result.error.message)
+            return {
+              type: 'image',
+              mediaType: result.value.attachment.mediaType,
+              data: bytesToBase64(result.value.data),
+            }
+          }))
+          const draftParts = await Promise.all(drafts.map(async (draft): Promise<PromptContentPart> => {
+            // createDraftImages already MIME-validated every draft file.
+            return {
+              type: 'image',
+              mediaType: draft.file.type as ImageMediaType,
+              data: bytesToBase64(new Uint8Array(await draft.file.arrayBuffer())),
+              ...(draft.file.name === '' ? {} : { name: draft.file.name }),
+            }
+          }))
+          const parts: PromptContentPart[] = [{ type: 'text', text }, ...keptParts, ...draftParts]
+          // The edited message's own turn: the last turn that opens at or
+          // before the anchored `user/message` event.
+          const { turnOrder, turns } = snapshot.chat.timeline
+          let targetIdx = -1
+          for (let index = 0; index < turnOrder.length; index++) {
+            const turn = turnOrder[index]
+            if (turn === undefined) break
+            const start = turns.get(turn)?.start?.seq
+            if (start === undefined || start > seq) break
+            targetIdx = index
+          }
+          if (targetIdx < 0) throw new Error(`no turn encloses the message at event ${String(seq)}`)
+          let childId: SessionId
+          // Only the fork path owns the child it creates; a first-turn
+          // connect may reuse an existing blank session, which cleanup must
+          // never touch.
+          let forked: boolean
+          if (targetIdx === 0) {
+            // The first turn: the regenerated conversation starts from a
+            // blank session on the same Workspace (reused when one exists,
+            // else freshly created) — no history survives the rewrite.
+            const workspace = workspaces.list.getSnapshot().items
+              .find(item => item.sessionIds.includes(sessionId))
+            if (workspace === undefined) {
+              throw new Error(`session "${sessionId}" belongs to no workspace`)
+            }
+            const preset = sessions.list.getSnapshot().byId[sessionId]?.agentPreset
+            childId = await workspaces.connectWorkspace(
+              workspace.workspaceId,
+              ...(preset === undefined ? [] : [preset]),
+            )
+            forked = false
+          } else {
+            // Cut through the previous turn's own end (the first turn/end at
+            // or after that seq is that end itself); the window-cut fallback
+            // anchors just before this turn's start instead.
+            const targetTurn = turnOrder[targetIdx]
+            const previousTurn = turnOrder[targetIdx - 1]
+            if (targetTurn === undefined || previousTurn === undefined) {
+              throw new Error(`the turn containing event ${String(seq)} disappeared from the loaded window`)
+            }
+            const atSeq = snapshot.turnEnds.get(previousTurn)
+              ?? (() => {
+                const start = turns.get(targetTurn)?.start?.seq
+                return start === undefined ? undefined : start - 1
+              })()
+            if (atSeq === undefined) {
+              throw new Error(`the turn before event ${String(seq)} is outside the loaded history window`)
+            }
+            childId = await sessions.fork({ sessionId, atSeq, increaseTitle: true })
+            forked = true
+          }
+          // The view switch waits for the send: the child is opened only after
+          // its prompt is accepted, so a failed rewrite leaves the user on the
+          // source conversation with the editor still open.
+          // Carry the source session's current model selection into the child:
+          // a fork seed cuts at a turn boundary, so the child can miss the
+          // request header that recorded a later manual switch and fall back
+          // to the deployment default — which an image-bearing rewrite would
+          // then reject. Best-effort: a failed carry-over leaves the child on
+          // its own selection instead of failing an otherwise valid rewrite.
+          try {
+            const connection = ctx.get('connection') as ConnectionHandle | undefined
+            if (connection !== undefined) {
+              const { result } = await connection.api.sessions.models({ sessionId })
+              if (result.ok) {
+                const { provider, model, reasoningEffort } = result.value.current
+                const selected = await connection.api.sessions.selectModel({
+                  sessionId: childId,
+                  provider,
+                  model,
+                  ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+                })
+                if (!selected.result.ok) throw new Error(selected.result.error.message)
+              }
+            }
+          } catch (reason) {
+            console.warn('rewrite model carry-over failed:', reason)
+          }
+          const child = sessions.binding(childId)?.session
+          if (child === undefined) throw new Error(`session "${childId}" is not locally addressable`)
+          const prompt = await child.prompt(parts, 'queue')
+          if (!prompt.ok) {
+            // The fork path owns the child it just created (a first-turn
+            // connect may have reused an existing blank session instead), so
+            // only that shell is discarded — the rejected edit leaves nothing
+            // behind and the source conversation never moved.
+            if (forked) {
+              try {
+                await sessions.remove(childId)
+              } catch (reason) {
+                console.warn('rewrite shell cleanup failed:', reason)
+              }
+            }
+            throw new Error(prompt.error.message)
+          }
+          sessions.open(childId)
+          // The source session stays in the list on purpose: every rewrite
+          // keeps its full pre-edit history reachable, and cleanup is the
+          // user's manual call.
         },
       }
     },

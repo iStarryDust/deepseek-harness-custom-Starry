@@ -273,6 +273,177 @@
   }
 }
 
+/* Inline edit-and-regenerate editor: swaps the bubble in place, keeps the
+   right-aligned stack geometry (same 525px cap), and mirrors the composer's
+   interaction colors. */
+.editStack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  width: min(525px, 82%);
+}
+
+.editArea {
+  width: 100%;
+  padding: 10px 16px;
+  border: 1px solid var(--dsw-alias-border-subtle);
+  border-radius: 22px;
+  background: var(--dsw-specific-bubble);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 16px;
+  line-height: 24px;
+  resize: vertical;
+}
+
+.editArea:focus-visible {
+  outline: none;
+  border-color: var(--dsw-alias-button-info-fill);
+}
+
+.editArea:disabled {
+  opacity: 0.6;
+}
+
+.editHint {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* Managed image strip: removable chips for kept and newly added images. */
+.editImageStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.editImageChip {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.editImageThumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.editImageRemove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 72%, transparent);
+  color: var(--dsw-specific-bubble);
+  cursor: pointer;
+}
+
+.editImageRemove:not(:disabled):hover {
+  background: var(--dsw-alias-label-primary);
+}
+
+.editImageRemove:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.editNotice {
+  color: var(--dsw-alias-state-warn-primary);
+  font-size: 12px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+
+.editFailure {
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 12px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+
+.editActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editActions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 16px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.editActions button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* The add-images affordance: a file-input label dressed as a tool chip. */
+.editImageAdd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  border: none;
+  border-radius: 16px;
+  background: none;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.editImageAdd:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.editImageInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.editCancel {
+  background: none;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.editCancel:not(:disabled):hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+.editConfirm {
+  background: var(--dsw-alias-button-info-fill);
+  color: var(--dsw-alias-button-info-label);
+}
+
+.editConfirm:not(:disabled):hover {
+  filter: brightness(1.08);
+}
+
 /* Inline references use domain glyphs and business-color text without another
    container inside the user bubble. */
 .refChip {

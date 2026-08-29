@@ -3,13 +3,17 @@
 // assistant answers), pending steering (copy only), context injection,
 // compaction marker, retry disclosure, and unknown-surface JSON rows.
 
-import { memo, useEffect, useMemo, useState } from 'react'
-import type { ReactNode } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import type { ChangeEvent, DragEvent, KeyboardEvent, ReactNode } from 'react'
 import type {
   ModelRetryNode, TurnErrorNode, UserMessageNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
-import { JsonBlock, MessageText, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps } from '../contract/slots.ts'
+import {
+  IconCloseOutline16, IconPlusOutline16, IconSendOutline16, JsonBlock, MessageText, StateDot,
+} from '@deepseek-ai/dsh-client-ui-primitives'
+import type {
+  ChatEditImageTools, ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, ComposerAttachment,
+} from '../contract/slots.ts'
 import { ReferenceIcon } from '../reference/ReferenceIcon.tsx'
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
@@ -277,11 +281,229 @@ export function PendingSteeringBubble({ content, renderMessageImages, t }: {
   )
 }
 
+/** One image row in the inline editor's managed strip. */
+type EditImage =
+  | { readonly key: string; readonly kind: 'kept'; readonly attachment: UserImage['attachment'] }
+  | { readonly key: string; readonly kind: 'draft'; readonly attachment: ComposerAttachment }
+
+/**
+ * Inline edit-and-regenerate editor for one durable user message: the bubble
+ * swaps for an auto-sized textarea above a managed image strip — every
+ * original image stays removable, picked or dropped files append as drafts
+ * (the composer's pipeline), and confirm hands the surviving set to the
+ * owner-provided {@link ChatNodeOwnerProps.rewriteFrom}. Failure keeps the
+ * editor open with the reason; success unmounts with the session switch.
+ */
+function UserMessageEditor({
+  seq, content, keptImages, editImageTools, rewriteFrom, onCancel, t,
+}: {
+  /** The `user/message` event seq the rewrite anchors on. */
+  seq: number
+  /** Complete durable content blocks (text and everything else). */
+  content: readonly unknown[]
+  keptImages: readonly UserImage['attachment'][]
+  editImageTools: ChatEditImageTools
+  rewriteFrom: ChatNodeOwnerProps['rewriteFrom']
+  onCancel: () => void
+  t: ChatViewSlotProps['t']
+}): ReactNode {
+  const initial = useMemo(() => contentParts(content).text, [content])
+  const [editImages, setEditImages] = useState<EditImage[]>(
+    () => keptImages.map(image => ({ key: image.attachmentId, kind: 'kept' as const, attachment: image })),
+  )
+  const [keptUrls, setKeptUrls] = useState<Record<string, string>>({})
+  const [draft, setDraft] = useState(initial)
+  const [pending, setPending] = useState(false)
+  const [failure, setFailure] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const editorRef = useRef<HTMLTextAreaElement | null>(null)
+  // The inject layer rebuilds these callbacks every render; refs keep the
+  // unmount cleanup and the URL loader stable without effect-dependency churn.
+  const toolsRef = useRef(editImageTools)
+  const draftsRef = useRef<ComposerAttachment[]>([])
+  const requestedKeptRef = useRef(new Set<string>())
+  useEffect(() => {
+    toolsRef.current = editImageTools
+    draftsRef.current = editImages.filter((item): item is Extract<EditImage, { kind: 'draft' }> => item.kind === 'draft')
+      .map(item => item.attachment)
+  })
+  // Focus with the caret at the end on open: the common edit touches the tail.
+  useEffect(() => {
+    const el = editorRef.current
+    if (el === null) return
+    el.focus()
+    const end = el.value.length
+    el.setSelectionRange(end, end)
+  }, [])
+  // Resolve each kept image's session-authorized URL exactly once.
+  useEffect(() => {
+    for (const item of editImages) {
+      if (item.kind !== 'kept' || requestedKeptRef.current.has(item.key)) continue
+      requestedKeptRef.current.add(item.key)
+      void toolsRef.current.resolveKept(item.attachment).then(
+        (url) => { setKeptUrls(current => ({ ...current, [item.key]: url })) },
+        () => { setKeptUrls(current => ({ ...current, [item.key]: '' })) },
+      )
+    }
+  }, [editImages])
+  // Drafts the editor created die with the editor: release previews whether
+  // the user cancels, the submit succeeds, or the tree unmounts underneath.
+  useEffect(() => () => {
+    toolsRef.current.releaseDrafts(draftsRef.current)
+  }, [])
+  const rows = Math.min(12, Math.max(2, draft.split('\n').length))
+  const removeImage = (key: string): void => {
+    setEditImages(current => current.filter(item => item.key !== key))
+  }
+  const addFiles = (files: readonly File[]): void => {
+    if (files.length === 0) return
+    const result = toolsRef.current.createDraft(files)
+    if (!result.ok) {
+      setNotice(result.reason)
+      return
+    }
+    setNotice(null)
+    setEditImages(current => [...current, ...result.attachments.map(attachment => ({
+      key: attachment.id, kind: 'draft' as const, attachment,
+    }))])
+  }
+  const onPickFiles = (event: ChangeEvent<HTMLInputElement>): void => {
+    const files = [...event.target.files ?? []]
+    event.target.value = ''
+    addFiles(files)
+  }
+  const onDrop = (event: DragEvent<HTMLElement>): void => {
+    const files = [...event.dataTransfer.files]
+    if (files.length === 0) return
+    event.preventDefault()
+    addFiles(files)
+  }
+  const onDragOver = (event: DragEvent<HTMLElement>): void => {
+    if (event.dataTransfer.types.includes('Files')) event.preventDefault()
+  }
+  const confirm = (): void => {
+    if (pending) return
+    if (draft.trim() === '' && editImages.length === 0) return
+    setPending(true)
+    setFailure(null)
+    const keptRefs = editImages
+      .filter((item): item is Extract<EditImage, { kind: 'kept' }> => item.kind === 'kept')
+      .map(item => item.attachment)
+    const drafts = editImages
+      .filter((item): item is Extract<EditImage, { kind: 'draft' }> => item.kind === 'draft')
+      .map(item => item.attachment)
+    rewriteFrom(seq, draft, keptRefs, drafts).then(() => {
+      // Success flips the view to the forked child; this subtree unmounts.
+    }).catch((error: unknown) => {
+      setPending(false)
+      setFailure(error instanceof Error ? error.message : String(error))
+    })
+  }
+  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (event.key === 'Escape' && !pending) {
+      event.preventDefault()
+      onCancel()
+      return
+    }
+    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault()
+      confirm()
+    }
+  }
+  const truncated = (total: number): string => t('json.truncated', { total })
+  return (
+    <div className={css.editStack} onDrop={onDrop} onDragOver={onDragOver}>
+      {editImages.length > 0 && (
+        <div className={css.editImageStrip}>
+          {editImages.map((item) => {
+            const src = item.kind === 'draft' ? item.attachment.previewUrl : keptUrls[item.key]
+            return (
+              <div key={item.key} className={css.editImageChip}>
+                {src === undefined
+                  ? <div className={css.editImageThumb} aria-hidden />
+                  : <img className={css.editImageThumb} src={src} alt="" />}
+                <button
+                  type="button"
+                  className={css.editImageRemove}
+                  aria-label={t('message.edit.image.remove')}
+                  disabled={pending}
+                  onClick={() => { removeImage(item.key) }}
+                >
+                  <IconCloseOutline16 />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+      <textarea
+        ref={editorRef}
+        className={css.editArea}
+        rows={rows}
+        value={draft}
+        aria-label={t('message.edit')}
+        disabled={pending}
+        onChange={(event) => { setDraft(event.target.value) }}
+        onKeyDown={onKeyDown}
+      />
+      {contentParts(content).rest.map((block, i) => (
+        <JsonBlock key={i} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />
+      ))}
+      <div className={css.editHint}>{t('message.edit.hint')}</div>
+      {notice !== null && <div className={css.editNotice} role="status">{notice}</div>}
+      {failure !== null && <div className={css.editFailure} role="alert">{t('message.edit.failed', { reason: failure })}</div>}
+      <div className={css.editActions}>
+        <label className={css.editImageAdd} aria-label={t('message.edit.image.add')} title={t('message.edit.image.add')}>
+          <IconPlusOutline16 />
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            multiple
+            className={css.editImageInput}
+            disabled={pending}
+            onChange={onPickFiles}
+          />
+        </label>
+        <button type="button" className={css.editCancel} disabled={pending} onClick={onCancel}>
+          {t('message.edit.cancel')}
+        </button>
+        <button
+          type="button"
+          className={css.editConfirm}
+          disabled={pending || (draft.trim() === '' && editImages.length === 0)}
+          onClick={confirm}
+        >
+          <IconSendOutline16 />
+          {t('message.edit.save')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 /** User and admitted-steering keyed Chat renderer. */
 export const UserMessageNodeView = memo(function UserMessageNodeView({
-  node, renderMessageImages, t,
+  node, renderMessageImages, rewriteFrom, editImageTools, useSession, t,
 }: ChatNodeViewProps<'user' | 'steering'>) {
   const data = node.data
+  const running = useSession(snapshot => snapshot.running)
+  const [editing, setEditing] = useState(false)
+  const { images } = useMemo(() => contentParts(data.content), [data.content])
+  if (editing) {
+    return (
+      <div className={css.userRow} data-time-hover-root>
+        <UserMessageEditor
+          seq={data.seq}
+          content={data.content}
+          keptImages={images.map(image => image.attachment)}
+          editImageTools={editImageTools}
+          rewriteFrom={rewriteFrom}
+          onCancel={() => { setEditing(false) }}
+          t={t}
+        />
+      </div>
+    )
+  }
   return (
     <UserStyleBubble
       content={data.content}
@@ -294,6 +516,8 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
           time={data.time}
           clock="start"
           className={css.actions}
+          onEdit={data.kind === 'user' ? () => { setEditing(true) } : undefined}
+          editUnavailable={running}
           t={t}
         />
       )}

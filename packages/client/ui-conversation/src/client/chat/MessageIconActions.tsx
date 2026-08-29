@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import {
-  IconBranchOutline16, IconCheckOutline16, IconCopyOutline16, Tooltip, writeClipboard,
+  IconBranchOutline16, IconCheckOutline16, IconCopyOutline16, IconEditOutline16, Tooltip, writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { formatLatencySeconds, formatMessageClock, formatRunDuration, formatTokensPerSecond } from './message-chrome.ts'
@@ -27,6 +27,10 @@ export interface MessageIconActionsProps {
   onBranch?: (() => void) | undefined
   /** The message is not a completed transcript tail, so branch stays visible but unavailable. */
   branchUnavailable?: boolean | undefined
+  /** Open the message's inline edit editor; omission hides the edit action. */
+  onEdit?: (() => void) | undefined
+  /** The agent is running, so edit stays visible but unavailable. */
+  editUnavailable?: boolean | undefined
   /** Parent layout class composed onto the actions row. */
   className?: string | undefined
   /** Slot-rendered actions owned by independent plugins, placed between the
@@ -45,16 +49,19 @@ export interface MessageIconActionsProps {
 }
 
 /**
- * Copy / branch (/ clock) IconActions row shared by user and assistant chrome.
+ * Copy / edit / branch (/ clock) IconActions row shared by user and assistant
+ * chrome.
  * @param props - Copy text, event time, clock side, branch callback, className.
  * @returns The actions row element.
  */
 export function MessageIconActions({
-  text, time, runMs, ttftMs, tokensPerSecond, clock, onBranch, branchUnavailable = false, className,
+  text, time, runMs, ttftMs, tokensPerSecond, clock, onBranch, branchUnavailable = false,
+  onEdit, editUnavailable = false, className,
   extraActions, clockMeta, t,
 }: MessageIconActionsProps) {
   const day = useCalendarDay()
   const reasonId = useId()
+  const editReasonId = useId()
   // Same success chrome as CodeBlock: a short check swap after the write,
   // gated so re-clicks during the window neither re-copy nor stack timers.
   const [copied, setCopied] = useState(false)
@@ -128,6 +135,25 @@ export function MessageIconActions({
           {copied ? <IconCheckOutline16 /> : <IconCopyOutline16 />}
         </button>
       </Tooltip>
+      {onEdit !== undefined && (
+        <Tooltip label={editUnavailable ? t('message.edit.unavailable') : t('message.edit')} side="bottom">
+          {/* Native disabled buttons do not deliver the hover/focus events Tooltip needs. */}
+          <button
+            type="button"
+            className={css.action}
+            aria-label={t('message.edit')}
+            aria-disabled={editUnavailable || undefined}
+            aria-describedby={editUnavailable ? editReasonId : undefined}
+            data-unavailable={editUnavailable || undefined}
+            onClick={editUnavailable ? undefined : onEdit}
+          >
+            <IconEditOutline16 />
+          </button>
+        </Tooltip>
+      )}
+      {onEdit !== undefined && editUnavailable && (
+        <span id={editReasonId} className={css.visuallyHidden}>{t('message.edit.unavailable')}</span>
+      )}
       {extraActions}
       {onBranch !== undefined && (
         <Tooltip label={branchUnavailable ? t('message.branchUnavailable') : t('message.branch')} side="bottom">

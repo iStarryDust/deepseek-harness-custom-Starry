@@ -429,6 +429,27 @@ export interface ChatNodeTurnDataInjected {
   }
 }
 
+/**
+ * Browser image operations the inline message editor needs: draft creation
+ * and disposal for newly picked files (the composer's pipeline), plus the
+ * session-authorized URL loader for kept historical images.
+ */
+export interface ChatEditImageTools {
+  /**
+   * Create browser draft images from picked files. MIME failures come back
+   * as the owner's localized `reason` (the composer's error mapping); the
+   * editor owns returned descriptors until it releases them.
+   */
+  createDraft: (
+    files: readonly File[],
+  ) => { readonly ok: true; readonly attachments: readonly ComposerAttachment[] }
+  | { readonly ok: false; readonly reason: string }
+  /** Release draft images the editor dropped or finished with. */
+  releaseDrafts: (attachments: readonly ComposerAttachment[]) => void
+  /** Session-authorized browser URL for one kept historical image. */
+  resolveKept: (attachment: ImageAttachmentRef) => Promise<string>
+}
+
 /** Stable owner currency delivered to one keyed Chat business renderer. */
 export interface ChatNodeOwnerProps {
   /** Selected Tool call, when the shared details store names one. */
@@ -438,6 +459,23 @@ export interface ChatNodeOwnerProps {
   openFile: (path: string) => void
   inspectCall: (callId: CallId) => void
   forkAt: (seq: number) => void
+  /**
+   * Edit-and-regenerate from one durable user message: fork (or create, for
+   * the first turn) a child cut before that message's turn, open it, and
+   * prompt the edited text with the surviving images re-admitted as fresh
+   * uploads. `seq` is the `user/message` event seq; `keptRefs` are the
+   * durable references the editor kept, `drafts` the newly added browser
+   * files — both ride the ordinary prompt admission path. Rejects while the
+   * source session is running.
+   */
+  rewriteFrom: (
+    seq: number,
+    text: string,
+    keptRefs: readonly ImageAttachmentRef[],
+    drafts: readonly ComposerAttachment[],
+  ) => Promise<void>
+  /** Browser image operations for the inline message editor. */
+  editImageTools: ChatEditImageTools
   /** Render a historical image group through the attachment slot. */
   renderMessageImages: RenderMessageImages
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
@@ -792,6 +830,18 @@ export interface ChatViewInjected {
   }
   /** Fork through the completed turn ending at the eligible message `seq`, then open the child. */
   forkAt: (seq: number) => void
+  /**
+   * Edit-and-regenerate from one durable user message (the
+   * {@link ChatNodeOwnerProps.rewriteFrom} contract; see there for semantics).
+   */
+  rewriteFrom: (
+    seq: number,
+    text: string,
+    keptRefs: readonly ImageAttachmentRef[],
+    drafts: readonly ComposerAttachment[],
+  ) => Promise<void>
+  /** Browser image operations for the inline message editor. */
+  editImageTools: ChatEditImageTools
   /**
    * Prose file-mention vocabulary for one closing message, from the optional
    * {@link ChatFileMentions} service (resolved lazily per call, so composing
