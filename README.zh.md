@@ -83,7 +83,7 @@ pnpm dsh web
 | `packages/preset/agent-memory` | — | **新增**：长期记忆——`<dshHome>/agent-memory` 下的 markdown 存储、四个开关（全局 / Agent / 自动 / 询问）、系统提示注入、`memory_add` 工具，以及一个用 Agent 自身模型把圈选消息浓缩成记忆的记忆按钮 |
 | `packages/extensions/dsh-schedule-toggle` | — | **新增**：Web 设置→通用设置页的 **“定时提醒”** 开关；通过 profile `cordis.patch.yml`（热重载、无需重启）切换 `time-context` + `schedule` 插件。附带 Agent 技能 `web-schedule` / `web-browser` / `agent-memory`，覆盖定时提醒、内置浏览器、记忆三类工作流 |
 | `packages/preset/agent-presets` | `standard` 全量工具集 | **新增「定义模式」**：per-agent 按需环境——在 Web 界面勾选本次对话所需能力（终端 / 文件读写 / 文件检索 / 提问用户 / 待办 / 后台任务 / 技能 / 目标 / 网页检索 / 浏览器 / 计划模式 / 压缩 / 子代理 / 工作流 / Ralph 循环等，组块可拆分为独立勾选的子能力），宿主据此生成一次性合并预设（`<agentId>-env-<slug>`）并绑定空白会话；组装是 `standard` 的**严格子集**，可让宿主用会话自身模型分析描述、辅助推断能力勾选 |
-| `packages/client/ui-conversation` | 只读消息流 | **新增：编辑并重新生成** — 每条已发送的用户消息都有内联编辑入口：修改文本，保留 / 移除 / 新增图片（png / jpeg / webp / gif）后重发。会话从被编辑消息处**分叉（fork）** — 原会话保留，其后的轮次不再延续。分叉继承原会话的模型选择；重发失败时视图保持原位，残留的空分叉会话自动清理 |
+| `packages/client/ui-conversation` | 只读消息流 | **新增：编辑并重新生成** — 每条已发送的用户消息都有内联编辑入口：修改文本，保留 / 移除 / 新增图片（png / jpeg / webp / gif）后重发。会话从被编辑消息处**分叉（fork）**：原会话保留，其后的轮次不再延续，分叉继承原会话的模型选择。重发失败时视图保持原位并自动清理残留的空分叉会话；上下文压缩导致轮次离开当前窗口后，对应消息不可再编辑 |
 
 并继承上游 `0.1.1-rc.2` 的全部能力——含 **统一图像请求管线**（规范化附件、路由级请求版本、DeepSeek Files 生命周期）。
 

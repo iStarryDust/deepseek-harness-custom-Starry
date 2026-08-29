@@ -51,18 +51,27 @@ interface MessageItemProps {
   readonly referenceLabels?: readonly string[]
   /** Fixture-observable running bit behind the standard `useSession` kit. */
   readonly running?: boolean
+  /** The loaded window holds no turn enclosing the message (compacted away). */
+  readonly noEnclosingTurn?: boolean
   /** Records the edit-and-regenerate request instead of forking a session. */
   readonly rewriteFrom?: ChatNodeOwnerProps['rewriteFrom']
   /** Overrides the editor's browser image operations (drafts, kept URLs). */
   readonly editImageTools?: ChatNodeOwnerProps['editImageTools']
 }
 
-/** Standard-kit doubles shared by every fixture render (idle session). */
-const idleSessionSource = {
-  getSnapshot: () => ({ running: false }),
-  subscribe: () => () => {},
+/** Standard-kit session double: one closed turn anchored at `windowStartSeq`. */
+const fixtureSessionSource = (running: boolean, windowStartSeq: number) => {
+  // One stable snapshot object: object-valued selectors (chat.timeline)
+  // compare by reference, so per-call snapshots would loop the re-render.
+  const snapshot = {
+    running,
+    chat: { timeline: {
+      turnOrder: [1],
+      turns: new Map([[1, { start: { seq: windowStartSeq } }]]),
+    } },
+  }
+  return { getSnapshot: () => snapshot, subscribe: () => () => {} }
 }
-const fixtureUseSession = bindSnapshotSelector(idleSessionSource) as unknown as ChatNodeViewProps['useSession']
 const noopRewriteFrom: ChatNodeOwnerProps['rewriteFrom'] = () => Promise.resolve()
 const fixtureEditImageTools: ChatNodeOwnerProps['editImageTools'] = {
   createDraft: files => ({
@@ -80,7 +89,8 @@ const fixtureEditImageTools: ChatNodeOwnerProps['editImageTools'] = {
 
 /** Legacy-node fixture adapter for the independently registered renderers. */
 function MessageItem({
-  node, t: translate, referenceLabels, running = false, rewriteFrom = noopRewriteFrom,
+  node, t: translate, referenceLabels, running = false, noEnclosingTurn = false,
+  rewriteFrom = noopRewriteFrom,
   editImageTools = fixtureEditImageTools,
 }: MessageItemProps) {
   const kind = node.kind === 'assistant' ? 'assistant-step' : node.kind
@@ -98,9 +108,9 @@ function MessageItem({
         ? { ...node, referenceLabels }
         : node,
   }
-  const useSession = running
-    ? (bindSnapshotSelector({ getSnapshot: () => ({ running: true }), subscribe: () => () => {} }) as unknown as ChatNodeViewProps['useSession'])
-    : fixtureUseSession
+  const useSession = bindSnapshotSelector(
+    fixtureSessionSource(running, noEnclosingTurn ? node.seq + 10 : 0),
+  ) as unknown as ChatNodeViewProps['useSession']
   const props = { node: viewNode, t: translate, renderMessageImages, useSession, rewriteFrom, editImageTools } as ChatNodeViewProps
   switch (node.kind) {
     case 'user':
@@ -212,6 +222,22 @@ describe('MessageItem arms', () => {
     expect(edit.getAttribute('aria-disabled')).toBe('true')
     fireEvent.click(edit)
     expect(screen.queryByRole('textbox')).toBeNull()
+  })
+
+  it('keeps the edit action unavailable once the turn left the loaded window', () => {
+    render(
+      <MessageItem t={t} noEnclosingTurn node={{
+        kind: 'user', seq: 1, time: 1_000,
+        content: [{ type: 'text', text: 'compacted away' }] as never,
+        source: null,
+      }} />,
+    )
+    const edit = screen.getByRole('button', { name: '修改这条消息' })
+    expect(edit.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(edit)
+    expect(screen.queryByRole('textbox')).toBeNull()
+    // The hidden reason names the compaction, not the generic running state.
+    expect(screen.getByText('该消息所在轮次已不在当前窗口（上下文已压缩），无法修改')).toBeTruthy()
   })
 
   it('the inline editor prefills the joined text and hands the edit to rewriteFrom', async () => {

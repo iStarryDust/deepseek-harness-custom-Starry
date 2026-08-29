@@ -492,7 +492,12 @@ export function apply(ctx: Context): void {
             if (start === undefined || start > seq) break
             targetIdx = index
           }
-          if (targetIdx < 0) throw new Error(`no turn encloses the message at event ${String(seq)}`)
+          if (targetIdx < 0) {
+            throw new Error(
+              `the turn containing event ${String(seq)} is outside the loaded window`
+              + ' (the context was compacted)',
+            )
+          }
           let childId: SessionId
           // Only the fork path owns the child it creates; a first-turn
           // connect may reuse an existing blank session, which cleanup must

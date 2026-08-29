@@ -287,6 +287,12 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     inspectCall,
     chatScroll,
     forkAt,
+    rewriteFrom: vi.fn(() => Promise.resolve()),
+    editImageTools: {
+      createDraft: () => ({ ok: true as const, attachments: [] }),
+      releaseDrafts: () => {},
+      resolveKept: () => Promise.reject(new Error('not used')),
+    },
     // Absent-service default; mention tests override with a real resolver.
     fileMentions: () => undefined,
     // Mirrors the real lookup chain (conversation namespace, then common).

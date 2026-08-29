@@ -294,6 +294,12 @@ function panelProps(data: WorkflowRunChatData, sessions = listState(), openSessi
     openFile: () => {},
     inspectCall: () => {},
     forkAt: () => {},
+    rewriteFrom: () => Promise.resolve(),
+    editImageTools: {
+      createDraft: () => ({ ok: true as const, attachments: [] }),
+      releaseDrafts: () => {},
+      resolveKept: () => Promise.resolve(''),
+    },
     renderMessageImages: () => null,
     fileMentions: () => undefined,
     openSession,
