@@ -419,6 +419,12 @@
 
     - id: browser
       name: '@deepseek-ai/dsh-browser'
+      config:
+        # Host layer keeps the settings namespace and the `ctx.browser` runtime
+        # but leaves tool registration to preset `toolOnly` rows, so a preset
+        # that never mounts a `browser` row (an env "define" mode that did not
+        # pick the browser) carries no browser tools in its requests.
+        registerTool: false
 
     # ── rows every mode mounts, whose values each overlay may state ──────────────
 

@@ -55,6 +55,14 @@ export interface BrowserPluginConfig {
    * per-session agent layer so the plugin does not re-register its namespace.
    */
   toolOnly?: boolean
+  /**
+   * Whether the host layer also registers the model-facing tools. `false`
+   * keeps the settings namespace and the `ctx.browser` runtime mounted while
+   * leaving tool registration to preset `toolOnly` rows — a preset that omits
+   * the `browser` row (e.g. an env "define" mode that did not pick the
+   * browser) then gets no browser tools at all.
+   */
+  registerTool?: boolean
   /** Cooperative tool-call timeout budget (ms). */
   timeoutMs?: number
 }
@@ -62,5 +70,6 @@ export interface BrowserPluginConfig {
 /** schemastery schema for the plugin composition config. */
 export const Config: z<BrowserPluginConfig> = z.object({
   toolOnly: z.boolean().default(false),
+  registerTool: z.boolean().default(true),
   timeoutMs: z.number().min(1).default(DEFAULT_BROWSER_TOOL_TIMEOUT_MS),
 })

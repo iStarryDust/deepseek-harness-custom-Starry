@@ -81,5 +81,9 @@ export function apply(ctx: Context, config: BrowserPluginConfig): void {
 
   const runtime = createBrowserRuntime(() => current())
   ctx.provide('browser', runtime)
-  applyBrowserTool(ctx, runtime, timeoutMs)
+  // `registerTool: false` keeps the namespace and runtime for preset toolOnly
+  // rows while dropping the host-level global tool registration, so presets
+  // that never mount a `browser` row (env "define" modes without the browser
+  // picked) carry no browser tools in their requests.
+  if (config.registerTool !== false) applyBrowserTool(ctx, runtime, timeoutMs)
 }
